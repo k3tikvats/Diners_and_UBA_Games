@@ -3,46 +3,46 @@ import { useState, useEffect, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 const mockQueue = [
-    { id: 1, name: "Player 1" },
-    { id: 2, name: "Player 2" },
-    { id: 3, name: "Player 3" },
-    { id: 4, name: "Player 4" },
-    { id: 5, name: "Player 5" },
-    { id: 6, name: "Player 6" },
-    { id: 7, name: "Player 7" },
-    { id: 8, name: "Player 8" },
-    { id: 9, name: "Player 9" },
-    { id: 10, name: "Player 10" },
-    { id: 11, name: "Player 11" },
-    { id: 12, name: "Player 12" },
-    { id: 13, name: "Player 13" },
-    { id: 14, name: "Player 14" },
-    { id: 15, name: "Player 15" },
-    { id: 16, name: "Player 16" },
-    { id: 17, name: "Player 17" },
-    { id: 18, name: "Player 18" },
-    { id: 19, name: "Player 19" },
-    { id: 20, name: "Player 20" },
-    { id: 21, name: "Player 21" },
-    { id: 22, name: "Player 22" },
-    { id: 23, name: "Player 23" },
-    { id: 24, name: "Player 24" },
-    { id: 25, name: "Player 25" },
-    { id: 26, name: "Player 26" },
-    { id: 27, name: "Player 27" },
-    { id: 28, name: "Player 28" },
-    { id: 29, name: "Player 29" },
-    { id: 30, name: "Player 30" },
-    { id: 31, name: "Player 31" },
-    { id: 32, name: "Player 32" },
-    { id: 33, name: "Player 33" },
-    { id: 34, name: "Player 34" },
-    { id: 35, name: "Player 35" },
-    { id: 36, name: "Player 36" },
-    { id: 37, name: "Player 37" },
-    { id: 38, name: "Player 38" },
-    { id: 39, name: "Player 39" },
-    { id: 40, name: "Player 40" }
+  { id: 1, name: "Player 1", status: "Ready" },
+  { id: 2, name: "Player 2", status: "Not Ready" },
+  { id: 3, name: "Player 3", status: "Disconnected" },
+  { id: 4, name: "Player 4", status: "Ready" },
+  { id: 5, name: "Player 5", status: "Not Ready" },
+  { id: 6, name: "Player 6", status: "Ready" },
+  { id: 7, name: "Player 7", status: "Disconnected" },
+  { id: 8, name: "Player 8", status: "Ready" },
+  { id: 9, name: "Player 9", status: "Not Ready" },
+  { id: 10, name: "Player 10", status: "Ready" },
+  { id: 11, name: "Player 11", status: "Disconnected" },
+  { id: 12, name: "Player 12", status: "Not Ready" },
+  { id: 13, name: "Player 13", status: "Ready" },
+  { id: 14, name: "Player 14", status: "Ready" },
+  { id: 15, name: "Player 15", status: "Disconnected" },
+  { id: 16, name: "Player 16", status: "Not Ready" },
+  { id: 17, name: "Player 17", status: "Ready" },
+  { id: 18, name: "Player 18", status: "Disconnected" },
+  { id: 19, name: "Player 19", status: "Not Ready" },
+  { id: 20, name: "Player 20", status: "Ready" },
+  { id: 21, name: "Player 21", status: "Not Ready" },
+  { id: 22, name: "Player 22", status: "Ready" },
+  { id: 23, name: "Player 23", status: "Disconnected" },
+  { id: 24, name: "Player 24", status: "Ready" },
+  { id: 25, name: "Player 25", status: "Not Ready" },
+  { id: 26, name: "Player 26", status: "Ready" },
+  { id: 27, name: "Player 27", status: "Disconnected" },
+  { id: 28, name: "Player 28", status: "Not Ready" },
+  { id: 29, name: "Player 29", status: "Ready" },
+  { id: 30, name: "Player 30", status: "Disconnected" },
+  { id: 31, name: "Player 31", status: "Ready" },
+  { id: 32, name: "Player 32", status: "Not Ready" },
+  { id: 33, name: "Player 33", status: "Ready" },
+  { id: 34, name: "Player 34", status: "Disconnected" },
+  { id: 35, name: "Player 35", status: "Ready" },
+  { id: 36, name: "Player 36", status: "Not Ready" },
+  { id: 37, name: "Player 37", status: "Disconnected" },
+  { id: 38, name: "Player 38", status: "Ready" },
+  { id: 39, name: "Player 39", status: "Not Ready" },
+  { id: 40, name: "Player 40", status: "Ready" },
 ];
 
 const initialPoolsState = {
@@ -58,6 +58,8 @@ const QueueScreen = ({ gameType }) => {
   const [pools, setPools] = useState(initialPoolsState);
   const [history, setHistory] = useState([]);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [selectedPlayers, setSelectedPlayers] = useState([]);
+  const [isSelecting, setIsSelecting] = useState(false);
   const POOL_SIZE = 12;
 
   // Load state on mount
@@ -99,7 +101,7 @@ const QueueScreen = ({ gameType }) => {
   }, [queue, pools]);
 
   const handleUndo = () => {
-    if (history.length > 0) {
+    if (history.length > 0 && window.confirm('Are you sure you want to Undo?')) {
       const previousState = history[history.length - 1];
       setQueue(previousState.queue);
       setPools(previousState.pools);
@@ -129,195 +131,238 @@ const QueueScreen = ({ gameType }) => {
 
   const allotPlayers = () => {
     if (queue.length < POOL_SIZE) return;
-
+  
     saveToHistory();
-    const players = [...queue];
+    let players = [...queue];
     const newPools = { ...pools };
-    
+  
     let poolName = 'A';
-    while (players.length >= POOL_SIZE && poolName <= 'E') {
-      const poolPlayers = players.splice(0, POOL_SIZE);
-      newPools[poolName] = {
-        players: poolPlayers,
-        status: 'Ready'
-      };
+    while (players.length > 0 && poolName <= 'E') {
+      const remainingSlots = POOL_SIZE - newPools[poolName].players.length;
+  
+      if (remainingSlots > 0) {
+        const poolPlayers = players.splice(0, remainingSlots);
+        newPools[poolName].players = [...newPools[poolName].players, ...poolPlayers];
+        newPools[poolName].status = checkPoolStatus(newPools[poolName], POOL_SIZE);
+      }
+  
       poolName = String.fromCharCode(poolName.charCodeAt(0) + 1);
     }
-
+  
     setPools(newPools);
     setQueue(players);
   };
 
-  const onDragEnd = (result) => {
-    const { source, destination } = result;
-    if (!destination) return;
-
-    saveToHistory();
-
-    const newQueue = [...queue];
-    const newPools = JSON.parse(JSON.stringify(pools));
-
-    // Get the player being moved
-    let player;
-    if (source.droppableId === 'queue') {
-      [player] = newQueue.splice(source.index, 1);
-    } else {
-      [player] = newPools[source.droppableId].players.splice(source.index, 1);
-      newPools[source.droppableId].status = 
-        newPools[source.droppableId].players.length === POOL_SIZE ? 'Ready' : 'Not Started';
+  const getColor = (status) => {
+    
+    switch (status) {
+      case 'Ready':
+        return 'bg-green-100';
+      case 'Not Ready':
+        return 'bg-blue-200';
+      case 'Disconnected':
+        return 'bg-red-100';
+      default:
+        return 'bg-gray-200';
     }
+  };
 
-    // Add player to destination
-    if (destination.droppableId === 'queue') {
-      newQueue.splice(destination.index, 0, player);
-    } else {
-      if (!newPools[destination.droppableId].players) {
-        newPools[destination.droppableId].players = [];
-      }
-      newPools[destination.droppableId].players.splice(destination.index, 0, player);
-      newPools[destination.droppableId].status = 
-        newPools[destination.droppableId].players.length === POOL_SIZE ? 'Ready' : 'Not Started';
-    }
+  const manualReadyPool = (poolName) => {
+    const newPools = { ...pools };
+    newPools[poolName].status = 'Ready';
 
-    setQueue(newQueue);
     setPools(newPools);
   };
 
+  const checkPoolStatus = (pool, poolsize) => {
+    if (pool.status === 'Ready') {
+      return 'Ready';
+    }
+    if (pool.players.length !== poolsize) {
+      return 'Not Started';
+    }
+    return pool.players.every((player) => player.status === 'Ready') ? 'Ready' : 'Not Ready';
+  };
+
+  // Select and drop
+
+  const toggleSelect = () => {
+    setIsSelecting((prev) => !prev);
+  };
+
+  const handleSelectPlayer = (playerId) => {
+    if(!isSelecting) return;
+    setSelectedPlayers((prevSelected) =>
+      prevSelected.includes(playerId) ? prevSelected.filter((id) => id !== playerId) : [...prevSelected, playerId]
+    );
+  };
+
+  const handleDropPlayersToPool = (poolName) => {
+    if (selectedPlayers.length === 0) return;
+  
+    saveToHistory();
+  
+    let selectedFromQueue = queue.filter((player) => selectedPlayers.includes(player.id));
+    let remainingQueue = queue.filter((player) => !selectedPlayers.includes(player.id));
+  
+    let selectedFromPools = [];
+    let updatedPools = { ...pools };
+  
+    // Extract selected players from pools
+    Object.keys(updatedPools).forEach((pool) => {
+      updatedPools[pool].players = updatedPools[pool].players.filter((player) => {
+        if (selectedPlayers.includes(player.id)) {
+          selectedFromPools.push(player);
+          return false; // Remove from the pool
+        }
+        return true;
+      });
+      updatedPools[pool].status = checkPoolStatus(updatedPools[pool], POOL_SIZE);
+    });
+  
+    const allSelected = [...selectedFromQueue, ...selectedFromPools];
+  
+    if (updatedPools[poolName].players.length + allSelected.length <= POOL_SIZE) {
+      updatedPools[poolName].players = [...updatedPools[poolName].players, ...allSelected];
+      updatedPools[poolName].status = checkPoolStatus(updatedPools[poolName], POOL_SIZE);
+      setPools(updatedPools);
+      setQueue(remainingQueue);
+      setSelectedPlayers([]);
+    } else {
+      alert(`Pool ${poolName} is full or doesn't have enough space.`);
+    }
+
+    toggleSelect();
+  };
+  
+  const handleDropPlayersToQueue = () => {
+    if (selectedPlayers.length === 0) return;
+  
+    saveToHistory();
+  
+    let selectedFromPools = [];
+    let updatedPools = { ...pools };
+  
+    // Extract selected players from pools
+    Object.keys(updatedPools).forEach((pool) => {
+      updatedPools[pool].players = updatedPools[pool].players.filter((player) => {
+        if (selectedPlayers.includes(player.id)) {
+          selectedFromPools.push(player);
+          return false; // Remove from the pool
+        }
+        return true;
+      });
+      updatedPools[pool].status = checkPoolStatus(updatedPools[pool], POOL_SIZE);
+    });
+  
+    setQueue((prevQueue) => [...prevQueue, ...selectedFromPools]);
+    setPools(updatedPools);
+    setSelectedPlayers([]);
+
+    toggleSelect();
+  };
+
   return (
-    <DragDropContext onDragEnd={onDragEnd}>
-      <div className="space-y-8">
-        {/* Control Buttons */}
-        <div className="flex justify-end space-x-4">
+    <div className="space-y-8">
+      <div className="flex justify-end space-x-4">
+        <button 
+          onClick={toggleSelect}
+          className={`px-4 py-2 rounded-lg transition ${
+            isSelecting
+              ? "bg-green-600 hover:bg-green-700"
+              : "bg-gray-600 hover:bg-gray-700"
+          } text-white`}
+        >
+          Select
+        </button>
+        <button
+          onClick={handleUndo}
+          disabled={history.length === 0}
+          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+        >
+          Undo Last Action
+        </button>
+        <button
+          onClick={handleReset}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+        >
+          Reset
+        </button>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-gray-800">Waiting Queue - {gameType?.toUpperCase()}</h2>'
           <button
-            onClick={handleUndo}
-            disabled={history.length === 0}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 
-                     disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+            onClick={() => handleDropPlayersToQueue()}
+            className={`bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition ${
+              selectedPlayers.length === 0 ? "hidden" : ""
+            }`}
           >
-            Undo Last Action
+            Drop Selected Players Here
           </button>
           <button
-            onClick={handleReset}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 
-                     transition"
+            onClick={allotPlayers}
+            disabled={queue.length < POOL_SIZE}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
           >
-            Reset
+            Allot Players to Pools
           </button>
         </div>
 
-        {/* Waiting Queue Section */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">
-              Waiting Queue - {gameType?.toUpperCase()}
-            </h2>
-            <button 
-              onClick={allotPlayers}
-              disabled={queue.length < POOL_SIZE}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 
-                       disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-            >
-              Allot Players to Pools
-            </button>
-          </div>
-
-          <Droppable droppableId="queue" direction="horizontal">
-            {(provided, snapshot) => (
-              <div 
-                ref={provided.innerRef}
-                {...provided.droppableProps}
-                className={`bg-gray-50 rounded-lg p-4 min-h-[60px] ${
-                  snapshot.isDraggingOver ? 'bg-blue-50' : ''
-                }`}
-              >
-                <div className="flex flex-wrap gap-2">
-                  {queue.map((player, index) => (
-                    <Draggable 
-                      key={`queue-${player.id}`}
-                      draggableId={`queue-${player.id}`}
-                      index={index}
-                    >
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          className={`bg-blue-100 text-blue-800 px-3 py-1 rounded-full cursor-move
-                                   ${snapshot.isDragging ? 'opacity-50 shadow-lg' : ''}`}
-                        >
-                          {player.name}
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </div>
-              </div>
-            )}
-          </Droppable>
-        </div>
-
-        {/* Pools Section */}
-        <div className="space-y-4">
-          {Object.entries(pools).map(([poolName, pool]) => (
-            <div key={poolName} className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-800">
-                    Pool {poolName}
-                  </h3>
-                  <p className="text-gray-600">
-                    Players: {pool.players?.length || 0} / {POOL_SIZE}
-                  </p>
-                </div>
-                <span className={`px-3 py-1 rounded-full text-sm ${
-                  pool.status === 'Ready' 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {pool.status}
-                </span>
-              </div>
-
-              <Droppable droppableId={poolName} direction="horizontal">
-                {(provided, snapshot) => (
-                  <div 
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={`bg-gray-50 rounded-lg p-4 min-h-[60px] ${
-                      snapshot.isDraggingOver ? 'bg-green-50' : ''
-                    }`}
-                  >
-                    <div className="flex flex-wrap gap-2">
-                      {pool.players?.map((player, index) => (
-                        <Draggable 
-                          key={`pool-${poolName}-${player.id}`}
-                          draggableId={`pool-${poolName}-${player.id}`}
-                          index={index}
-                        >
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className={`bg-gray-100 text-gray-800 px-3 py-1 rounded-full cursor-move
-                                       ${snapshot.isDragging ? 'opacity-50 shadow-lg' : ''}`}
-                            >
-                              {player.name}
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  </div>
-                )}
-              </Droppable>
-            </div>
+        <div className="flex flex-wrap gap-2 bg-gray-50 rounded-lg p-4">
+          {queue.map((player) => (
+            <span key={player.id} onClick={() => handleSelectPlayer(player.id)}
+            className={`px-3 py-1 rounded-full ${
+              selectedPlayers.includes(player.id) ? 'bg-green-400 text-white' : 'bg-blue-100 text-blue-800'
+            }`}>
+              {player.name}
+            </span>
           ))}
         </div>
       </div>
-    </DragDropContext>
+
+      <div className="space-y-4">
+        {Object.entries(pools).map(([poolName, pool]) => (
+          <div key={poolName} className="bg-white rounded-lg shadow p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800">Pool {poolName}</h3>
+                <p className="text-gray-600">Players: {pool.players?.length || 0} / {POOL_SIZE}</p>
+              </div>
+              <div className="flex items-center ml-auto space-x-4">
+                <button
+                  onClick={() => handleDropPlayersToPool(poolName)}
+                  className={`bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition ${
+                    selectedPlayers.length === 0 ? "hidden" : ""
+                  }`}
+                >
+                  Drop Selected Players Here
+                </button>
+                <span className={`px-3 py-1 rounded-full text-sm bg-${getColor(pool.status)}-100 text-gray-800`}>
+                  {pool.status}
+                </span>
+                {pool.status === 'Not Ready' && (
+                  <button onClick={() => manualReadyPool(poolName)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    Manual Ready
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 bg-gray-50 rounded-lg p-4">
+              {pool.players?.map((player) => (
+                <span key={player.id} onClick={() => handleSelectPlayer(player.id)}
+                className={`${selectedPlayers.includes(player.id) ? 'bg-green-400 text-white' : `${getColor(player.status)} text-gray-800`} px-3 py-1 rounded-full`}
+                >
+                  {player.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 
