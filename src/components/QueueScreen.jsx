@@ -93,22 +93,6 @@ const QueueScreen = ({ gameType }) => {
     }));
   }, [queue, pools, history, isInitialized]);
 
-  const saveToHistory = useCallback(() => {
-    setHistory(prev => [...prev, {
-      queue: [...queue],
-      pools: JSON.parse(JSON.stringify(pools))
-    }]);
-  }, [queue, pools]);
-
-  const handleUndo = () => {
-    if (history.length > 0 && window.confirm('Are you sure you want to Undo?')) {
-      const previousState = history[history.length - 1];
-      setQueue(previousState.queue);
-      setPools(previousState.pools);
-      setHistory(prev => prev.slice(0, -1));
-    }
-  };
-
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset? All players will return to the waiting queue.')) {
       // Get all players from pools
@@ -129,12 +113,35 @@ const QueueScreen = ({ gameType }) => {
     }
   };
 
+  const saveToHistory = useCallback(() => {
+    setHistory(prev => [
+      ...prev,
+      {
+        queue: [...queue], // Deep copy of the queue
+        pools: JSON.parse(JSON.stringify(pools)) // Deep copy of pools
+      }
+    ]);
+  }, [queue, pools]);
+  
+  const handleUndo = () => {
+    if (history.length > 0 && window.confirm('Are you sure you want to Undo?')) {
+      const previousState = history[history.length - 1];
+  
+      // Restore queue and pools with new copies
+      setQueue([...previousState.queue]); // ✅ New array
+      setPools(JSON.parse(JSON.stringify(previousState.pools))); // ✅ New deep copy
+  
+      // Remove the last history entry
+      setHistory(prev => prev.slice(0, -1));
+    }
+  };
+  
   const allotPlayers = () => {
     if (queue.length < POOL_SIZE) return;
   
-    saveToHistory();
+    saveToHistory(); // Save state BEFORE changes
     let players = [...queue];
-    const newPools = { ...pools };
+    const newPools = JSON.parse(JSON.stringify(pools)); // Deep copy pools
   
     let poolName = 'A';
     while (players.length > 0 && poolName <= 'E') {
@@ -202,36 +209,47 @@ const QueueScreen = ({ gameType }) => {
   
     saveToHistory();
   
-    let selectedFromQueue = queue.filter((player) => selectedPlayers.includes(player.id));
-    let remainingQueue = queue.filter((player) => !selectedPlayers.includes(player.id));
+    // Create deep copies of state
+    const currentQueue = [...queue];
+    const currentPools = JSON.parse(JSON.stringify(pools));
   
-    let selectedFromPools = [];
-    let updatedPools = { ...pools };
+    // Filter players from queue
+    const selectedFromQueue = currentQueue.filter(player => 
+      selectedPlayers.includes(player.id)
+    );
+    const remainingQueue = currentQueue.filter(player => 
+      !selectedPlayers.includes(player.id)
+    );
   
-    // Extract selected players from pools
-    Object.keys(updatedPools).forEach((pool) => {
-      updatedPools[pool].players = updatedPools[pool].players.filter((player) => {
+    // Filter players from pools
+    const selectedFromPools = [];
+    Object.keys(currentPools).forEach(pool => {
+      currentPools[pool].players = currentPools[pool].players.filter(player => {
         if (selectedPlayers.includes(player.id)) {
           selectedFromPools.push(player);
-          return false; // Remove from the pool
+          return false;
         }
         return true;
       });
-      updatedPools[pool].status = checkPoolStatus(updatedPools[pool], POOL_SIZE);
+      currentPools[pool].status = checkPoolStatus(currentPools[pool], POOL_SIZE);
     });
   
     const allSelected = [...selectedFromQueue, ...selectedFromPools];
-  
-    if (updatedPools[poolName].players.length + allSelected.length <= POOL_SIZE) {
-      updatedPools[poolName].players = [...updatedPools[poolName].players, ...allSelected];
-      updatedPools[poolName].status = checkPoolStatus(updatedPools[poolName], POOL_SIZE);
-      setPools(updatedPools);
+    
+    // Check capacity with current pool state
+    const targetPool = currentPools[poolName];
+    if (targetPool.players.length + allSelected.length <= POOL_SIZE) {
+      targetPool.players = [...targetPool.players, ...allSelected];
+      targetPool.status = checkPoolStatus(targetPool, POOL_SIZE);
+      
+      // Update states with new copies
+      setPools(currentPools);
       setQueue(remainingQueue);
       setSelectedPlayers([]);
     } else {
       alert(`Pool ${poolName} is full or doesn't have enough space.`);
     }
-
+  
     toggleSelect();
   };
   
@@ -240,25 +258,27 @@ const QueueScreen = ({ gameType }) => {
   
     saveToHistory();
   
-    let selectedFromPools = [];
-    let updatedPools = { ...pools };
+    // Create deep copies of state
+    const currentPools = JSON.parse(JSON.stringify(pools));
+    const selectedFromPools = [];
   
-    // Extract selected players from pools
-    Object.keys(updatedPools).forEach((pool) => {
-      updatedPools[pool].players = updatedPools[pool].players.filter((player) => {
+    // Remove players from pools
+    Object.keys(currentPools).forEach(pool => {
+      currentPools[pool].players = currentPools[pool].players.filter(player => {
         if (selectedPlayers.includes(player.id)) {
           selectedFromPools.push(player);
-          return false; // Remove from the pool
+          return false;
         }
         return true;
       });
-      updatedPools[pool].status = checkPoolStatus(updatedPools[pool], POOL_SIZE);
+      currentPools[pool].status = checkPoolStatus(currentPools[pool], POOL_SIZE);
     });
   
-    setQueue((prevQueue) => [...prevQueue, ...selectedFromPools]);
-    setPools(updatedPools);
+    // Update states with new copies
+    setQueue(prev => [...prev, ...selectedFromPools]);
+    setPools(currentPools);
     setSelectedPlayers([]);
-
+  
     toggleSelect();
   };
 
@@ -291,24 +311,26 @@ const QueueScreen = ({ gameType }) => {
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">Waiting Queue - {gameType?.toUpperCase()}</h2>'
-          <button
-            onClick={() => handleDropPlayersToQueue()}
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold text-gray-800">Waiting Queue - {gameType?.toUpperCase()}</h2>
+        <div className="flex space-x-4">
+          <button 
+            onClick={() => handleDropPlayersToQueue()} 
             className={`bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition ${
               selectedPlayers.length === 0 ? "hidden" : ""
             }`}
           >
             Drop Selected Players Here
           </button>
-          <button
-            onClick={allotPlayers}
-            disabled={queue.length < POOL_SIZE}
+          <button 
+            onClick={allotPlayers} 
+            disabled={queue.length < POOL_SIZE} 
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
           >
             Allot Players to Pools
           </button>
         </div>
+      </div>
 
         <div className="flex flex-wrap gap-2 bg-gray-50 rounded-lg p-4">
           {queue.map((player) => (
