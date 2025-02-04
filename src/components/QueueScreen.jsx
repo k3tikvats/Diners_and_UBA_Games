@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { collection, doc, getDoc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebaseDB';
+import { calculateDinersRoundScores, calculateUBARoundScores } from '@/lib/roundScores';
 // import { db } from '@/firebase';
 const QueueScreen = ({ gameType }) => {
   const [queue, setQueue] = useState([]);
@@ -8,31 +9,47 @@ const QueueScreen = ({ gameType }) => {
   const [history, setHistory] = useState([]);
   const [selectedPlayers, setSelectedPlayers] = useState([]);
   const [isSelecting, setIsSelecting] = useState(false);
+  const [started, setStarted] = useState(false)
 
   useEffect(() => {
     const docRef = doc(db, 'IGTS', 'Queue');
-
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (Array.isArray(data.users)) {
-          const emailQueue = data.users.map((email) => ({
-            id: email,
-            name: email,
-            status: 'Not Ready'
-          }));
-          setQueue(emailQueue);
+    const startedRef = doc(db, 'IGTS', 'started');
+    let s=false;
+    const unsubscribeStarted = onSnapshot(startedRef, (docSnap) => {
+      if(docSnap){
+        setStarted(docSnap.data().started)
+        s=docSnap.data().started
+      }
+    })
+    let unsubscribe ;
+    if(s){
+      // updated local state from pools state here
+    }else{
+     unsubscribe = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (Array.isArray(data.users)) {
+            const emailQueue = data.users.map((email) => ({
+              id: email,
+              name: email,
+              status: 'Not Ready'
+            }));
+            setQueue(emailQueue);
+          } else {
+            console.error('Users data is not in expected format.');
+            setQueue([]);
+          }
         } else {
-          console.error('Users data is not in expected format.');
+          console.log('Queue document does not exist.');
           setQueue([]);
         }
-      } else {
-        console.log('Queue document does not exist.');
-        setQueue([]);
-      }
-    });
+      });
+    }
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe()
+      unsubscribeStarted()
+    };
   }, []);
 
   const saveToHistory = useCallback(() => {
@@ -94,8 +111,12 @@ const QueueScreen = ({ gameType }) => {
   
         for (const [poolName, pool] of Object.entries(pools)) {
           const poolCollectionRef = collection(gameDocRef, `pool${poolName}`); // Collection for each pool
+          
+
           const usersDocRef = doc(poolCollectionRef, 'users'); // Document to store users
           const inputDocRef = doc(poolCollectionRef, 'input'); // Document to store input
+          const scoreDocRef = doc(poolCollectionRef, 'score'); // Document to store score
+          const detailDocRef = doc(poolCollectionRef, 'details'); // Document to store details
   
           const playerEmails = pool.players.map(player => player.id); // Extract emails
           const numUsers = playerEmails.length; // Get number of users in the pool
@@ -108,17 +129,20 @@ const QueueScreen = ({ gameType }) => {
               round2: new Array(numUsers).fill(-1),
               round3: new Array(numUsers).fill(-1),
             };
+            
           } else if (gameType === 'uba') {
             inputData = {
-              round1: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(-1)])),
-              round2: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(-1)])),
-              round3: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(-1)])),
+              round1: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(0)])),
+              round2: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(0)])),
+              round3: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(0)])),
             };
+           
           }
-  
+          
           // Store users and input data in Firestore
           await setDoc(usersDocRef, { users: playerEmails });
           await setDoc(inputDocRef, inputData);
+          await setDoc(detailDocRef, {round: 1, status: false});
         }
   
         alert('Game has started, pools assigned, and input initialized!');
@@ -147,6 +171,21 @@ const QueueScreen = ({ gameType }) => {
     }
   };
   
+
+  const handleEndGame = async () => {
+    if (window.confirm('Are you sure you want to end the game?')) { 
+      try {
+        const startedRef = doc(db, 'IGTS', 'started');
+        await updateDoc(startedRef, { started: false });
+        console.log("Game ended successfully!");
+      }catch (error) {
+        console.error('Error ending the game:', error);
+        alert('Failed to end the game. Please try again.');
+      }
+    }
+  }
+
+        
 
   const createPool = () => {
     saveToHistory();
@@ -263,46 +302,70 @@ const QueueScreen = ({ gameType }) => {
     setPools(updatedPools);
   };
 
+  const handleCalculateScore = async (poolName) => {
+    let round=1;
+    if(gameType==='diners') await calculateDinersRoundScores(round, 'pool'+poolName);
+    else await calculateUBARoundScores(round, 'pool'+poolName);
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex justify-end space-x-4">
+        {!started&&<div className='flex space-x-4'>
+
         <button 
           onClick={toggleSelect}
           className={`px-4 py-2 rounded-lg transition ${
             isSelecting ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-700"
           } text-white`}
-        >
+          >
           {isSelecting ? "Cancel Select" : "Select Players"}
         </button>
         {/* <button
           onClick={handleUndo}
           disabled={history.length === 0}
           className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 transition"
-        >
+          >
           Undo
-        </button> */}
+          </button> */}
         <button
           onClick={handleReset}
           className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-        >
+          >
           Reset
         </button>
         <button
           onClick={handleAllocatePlayersToPools}
           className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition"
-        >
-          Allocate Players to Pools
+          >
+          Allocate Players 
         </button>
+        <button
+        onClick={handleStartGame}
+        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+        >
+      Start Game
+      </button>
+        </div>}
+        {started && <button
+          onClick={handleEndGame}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+          >
+          End Game
+        </button>}
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-2xl font-bold text-gray-800">Waiting Queue - {gameType?.toUpperCase()}</h2>
+        <div className='flex space-x-2'>
+
+        <h2 className="text-2xl font-bold text-gray-800">Waiting Queue - {gameType?.toUpperCase()} : {queue.length}</h2>
         <button
           onClick={handleDropPlayersToQueue}
           className={`bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition ${selectedPlayers.length === 0 ? "hidden" : ""}`}
-        >
+          >
           Drop Selected Players Here
         </button>
+          </div>
         <div className="flex flex-wrap gap-2 bg-gray-50 rounded-lg p-4">
           {queue.map((player) => (
             <span key={player.id} onClick={() => handleSelectPlayer(player.id)}
@@ -318,13 +381,23 @@ const QueueScreen = ({ gameType }) => {
       <div className="space-y-4">
         {Object.entries(pools).map(([poolName, pool]) => (
           <div key={poolName} className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-xl font-bold text-gray-800">Pool {poolName}</h3>
+            <div className='flex justify-between'>
+            <div className='flex space-x-2'>
+            <h3 className="text-xl font-bold text-gray-800">Pool {poolName} : <span> {pool.players.length}</span></h3>
             <button
               onClick={() => handleDropPlayersToPool(poolName)}
               className={`bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition ${selectedPlayers.length === 0 ? "hidden" : ""}`}
             >
               Drop Selected Players Here
             </button>
+            </div>
+            {started&&<button
+              onClick={()=>handleCalculateScore(poolName)}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition"
+              >
+              Calculate Round Score 
+            </button>}
+                </div>
             <div className="flex flex-wrap gap-2 bg-gray-50 rounded-lg p-4">
               {pool.players.map((player) => (
                 <span key={player.id} onClick={() => handleSelectPlayer(player.id)}
@@ -345,12 +418,7 @@ const QueueScreen = ({ gameType }) => {
           Create Pool
       </button>
       <br />
-      <button
-        onClick={handleStartGame}
-        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-      >
-      Start Game
-      </button>
+      
     </div>
   );
 };
