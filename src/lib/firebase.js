@@ -1,13 +1,28 @@
 import { doc, setDoc, collection, getDocs, query, where, getDoc } from 'firebase/firestore';
 import { db } from '@/firebaseDB';
 
+const normalizeScores = (scores) => {
+    if (!scores || scores.length === 0) return [];
+
+    const minScore = Math.min(...scores);
+    const maxScore = Math.max(...scores);
+    if (minScore === maxScore) {
+        return scores.map(() => 100); // If all scores are the same, everyone gets 100
+    }
+    
+    return scores.map(score => ((score - minScore) / (maxScore - minScore)) * 100);
+};
+
+
 const uploadData = async (game, pool, round, scoreData) => {
     try {
         const scoresDocRef = doc(db, 'IGTS', game, pool, 'scores');
+        const detailsDocRef = doc(db, 'IGTS', game, pool, 'details');
         const finalScoresDocRef = doc(db, 'IGTS', game, pool, 'finalScores');
 
         // Fetch existing scores document
-        const scoresDoc = await getDoc(scoresDocRef);
+        const detailsDoc = await getDoc(detailsDocRef);
+        let details=detailsDoc.data()
 
         // Upload round data
         await setDoc(scoresDocRef, {
@@ -19,9 +34,10 @@ const uploadData = async (game, pool, round, scoreData) => {
         // Fetch existing finalScores document
         const finalScoresDoc = await getDoc(finalScoresDocRef);
         let finalScores = Array(scoreData.length).fill(0);
-
-        if (finalScoresDoc.exists()) {
-            finalScores = finalScoresDoc.data().finalScores;
+        if(round!=1){
+            if (finalScoresDoc.exists()) {
+                finalScores = finalScoresDoc.data().finalScores;
+            }
         }
 
         // Sum up scores from all rounds
@@ -30,7 +46,13 @@ const uploadData = async (game, pool, round, scoreData) => {
         }
 
         // Update finalScores document
+        details.round=round+1;
+        if (round === 3) {
+            details.status=true;
+            finalScores = normalizeScores(finalScores);
+        }
         await setDoc(finalScoresDocRef, { finalScores });
+        await setDoc(detailsDocRef, details);
 
     } catch (error) {
         console.error('Error uploading data:', error);

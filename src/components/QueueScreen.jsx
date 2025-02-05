@@ -102,25 +102,22 @@ const QueueScreen = ({ gameType }) => {
           }
         }
   
-        // Once all users' pools are updated, update the game status to "started"
-        const startedRef = doc(db, 'IGTS', 'started');
-        await updateDoc(startedRef, { started: true });
-  
+        
         // Reference to the game document in Firestore
         const gameDocRef = doc(db, 'IGTS', gameType);
-  
+        
         for (const [poolName, pool] of Object.entries(pools)) {
           const poolCollectionRef = collection(gameDocRef, `pool${poolName}`); // Collection for each pool
           
-
+          
           const usersDocRef = doc(poolCollectionRef, 'users'); // Document to store users
           const inputDocRef = doc(poolCollectionRef, 'input'); // Document to store input
           const scoreDocRef = doc(poolCollectionRef, 'score'); // Document to store score
           const detailDocRef = doc(poolCollectionRef, 'details'); // Document to store details
-  
+          
           const playerEmails = pool.players.map(player => player.id); // Extract emails
           const numUsers = playerEmails.length; // Get number of users in the pool
-  
+          
           // Initialize input data based on game type
           let inputData = {};
           if (gameType === 'diners') {
@@ -136,13 +133,18 @@ const QueueScreen = ({ gameType }) => {
               round2: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(0)])),
               round3: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(0)])),
             };
-           
+            
           }
           
           // Store users and input data in Firestore
           await setDoc(usersDocRef, { users: playerEmails });
           await setDoc(inputDocRef, inputData);
           await setDoc(detailDocRef, {round: 1, status: false});
+
+
+          // Once all users' pools are updated, update the game status to "started"
+          const startedRef = doc(db, 'IGTS', 'started');
+          await updateDoc(startedRef, { started: true });
         }
   
         alert('Game has started, pools assigned, and input initialized!');
@@ -303,7 +305,7 @@ const QueueScreen = ({ gameType }) => {
   };
 
   const handleCalculateScore = async (poolName) => {
-    let round=1;
+    let round=3;
     if(gameType==='diners') await calculateDinersRoundScores(round, 'pool'+poolName);
     else await calculateUBARoundScores(round, 'pool'+poolName);
   }
