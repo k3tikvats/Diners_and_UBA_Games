@@ -42,6 +42,16 @@ const UbaFinalScreen = () => {
       setLoading(true);
       
       // Batch fetch all documents at once
+      const docRef = doc(db, 'IGTS', 'uba'); // Ensure correct path
+      const docSnap = getDoc(docRef) // Ensure correct path
+      const collectionsSnapshot = await docSnap.listCollections();
+
+      for (const subColRef of collectionsSnapshot) {
+        console.log('Subcollection:', subColRef);
+      }
+
+
+
       const poolRef = collection(db, 'IGTS', 'uba', selectedPool);
       const [detailsDoc, finalScoresDoc, scoresDoc, usersDoc] = await Promise.all([
         getDoc(doc(poolRef, 'details')),
