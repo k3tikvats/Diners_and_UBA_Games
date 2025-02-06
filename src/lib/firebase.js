@@ -1,17 +1,32 @@
 import { doc, setDoc, collection, getDocs, query, where, getDoc } from 'firebase/firestore';
-import { fireStoreDB } from '../firebaseConfig';
+import { db } from '@/firebaseDB';
+
+const normalizeScores = (scores) => {
+    if (!scores || scores.length === 0) return [];
+
+    const minScore = Math.min(...scores);
+    const maxScore = Math.max(...scores);
+    if (minScore === maxScore) {
+        return scores.map(() => 100); // If all scores are the same, everyone gets 100
+    }
+    
+    return scores.map(score => ((score - minScore) / (maxScore - minScore)) * 100);
+};
+
 
 const uploadData = async (game, pool, round, scoreData) => {
     try {
-        const scoresDocRef = doc(fireStoreDB, 'IGTS', game, "Pool" + pool, 'scores');
-        const finalScoresDocRef = doc(fireStoreDB, 'IGTS', game, "Pool" + pool, 'finalScores');
+        const scoresDocRef = doc(db, 'IGTS', game, pool, 'scores');
+        const detailsDocRef = doc(db, 'IGTS', game, pool, 'details');
+        const finalScoresDocRef = doc(db, 'IGTS', game, pool, 'finalScores');
 
         // Fetch existing scores document
-        const scoresDoc = await getDoc(scoresDocRef);
+        const detailsDoc = await getDoc(detailsDocRef);
+        let details=detailsDoc.data()
 
         // Upload round data
         await setDoc(scoresDocRef, {
-            ["Round" + round]: scoreData
+            ["round" + round]: scoreData
         }, { merge: true });
 
         console.log(`Data for Round ${round} uploaded successfully!`);
@@ -19,9 +34,10 @@ const uploadData = async (game, pool, round, scoreData) => {
         // Fetch existing finalScores document
         const finalScoresDoc = await getDoc(finalScoresDocRef);
         let finalScores = Array(scoreData.length).fill(0);
-
-        if (finalScoresDoc.exists()) {
-            finalScores = finalScoresDoc.data().finalScores;
+        if(round!=1){
+            if (finalScoresDoc.exists()) {
+                finalScores = finalScoresDoc.data().finalScores;
+            }
         }
 
         // Sum up scores from all rounds
@@ -30,7 +46,13 @@ const uploadData = async (game, pool, round, scoreData) => {
         }
 
         // Update finalScores document
+        details.round=round+1;
+        if (round === 3) {
+            details.status=true;
+            finalScores = normalizeScores(finalScores);
+        }
         await setDoc(finalScoresDocRef, { finalScores });
+        await setDoc(detailsDocRef, details);
 
     } catch (error) {
         console.error('Error uploading data:', error);
@@ -44,7 +66,7 @@ const uploadData = async (game, pool, round, scoreData) => {
 const getData = async (game, pool, round) => {
     try {
         // Reference to the input document in the specified game and pool
-        const inputDocRef = doc(fireStoreDB, 'IGTS', game, "Pool"+pool, 'input');
+        const inputDocRef = doc(db, 'IGTS', game, pool, 'input');
 
         // Fetch the input document
         const inputDoc = await getDoc(inputDocRef);
@@ -53,10 +75,10 @@ const getData = async (game, pool, round) => {
             const inputData = inputDoc.data(); // Get the document data
 
             // Check if the round exists in the data and return it
-            if (inputData.hasOwnProperty("Round"+round)) {
-                return inputData["Round"+round];
+            if (inputData.hasOwnProperty("round"+round)) {
+                return inputData["round"+round];
             } else {
-                throw new Error(`${"Round"+round} not found in input data.`);
+                throw new Error(`${"round"+round} not found in input data.`);
             }
         } else {
             throw new Error(`Input document not found in ${game}/${pool}.`);
@@ -70,13 +92,13 @@ const getData = async (game, pool, round) => {
 const getFinalData = async (game, pool) => {
     try {
         // Reference to the finalscores document inside the specified game and pool
-        const finalScoresDocRef = doc(fireStoreDB, 'IGTS', game, `Pool${pool}`, 'finalScores');
+        const finalScoresDocRef = doc(db, 'IGTS', game, `pool${pool}`, 'finalScores');
 
         // Fetch the document
         const finalScoresDoc = await getDoc(finalScoresDocRef);
 
         if (!finalScoresDoc.exists()) {
-            throw new Error(`Final scores document not found in ${game}/Pool${pool}.`);
+            throw new Error(`Final scores document not found in ${game}/pool${pool}.`);
         }
 
         return finalScoresDoc.data()["finalScores"]; // Return the data (assumed to contain an array)
@@ -88,7 +110,7 @@ const getFinalData = async (game, pool) => {
 
 const uploadFinalData=async(pool,finalScoresData)=>{
     try {
-        const finalScoresDocRef = doc(fireStoreDB, 'IGTS', 'FinalScoreBoth', `Pool${pool}`, 'FinalScores');
+        const finalScoresDocRef = doc(db, 'IGTS', 'FinalScoreBoth', `pool${pool}`, 'FinalScores');
         await setDoc(finalScoresDocRef, { finalScores: finalScoresData });
     } catch (error) {
         console.error('Error uploading final scores:', error);

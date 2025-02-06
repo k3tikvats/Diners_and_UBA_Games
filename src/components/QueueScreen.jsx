@@ -1,204 +1,212 @@
-// src/components/QueueScreen.jsx
 import { useState, useEffect, useCallback } from 'react';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
-
-const mockQueue = [
-  { id: 1, name: "Player 1", status: "Ready" },
-  { id: 2, name: "Player 2", status: "Not Ready" },
-  { id: 3, name: "Player 3", status: "Disconnected" },
-  { id: 4, name: "Player 4", status: "Ready" },
-  { id: 5, name: "Player 5", status: "Not Ready" },
-  { id: 6, name: "Player 6", status: "Ready" },
-  { id: 7, name: "Player 7", status: "Disconnected" },
-  { id: 8, name: "Player 8", status: "Ready" },
-  { id: 9, name: "Player 9", status: "Not Ready" },
-  { id: 10, name: "Player 10", status: "Ready" },
-  { id: 11, name: "Player 11", status: "Disconnected" },
-  { id: 12, name: "Player 12", status: "Not Ready" },
-  { id: 13, name: "Player 13", status: "Ready" },
-  { id: 14, name: "Player 14", status: "Ready" },
-  { id: 15, name: "Player 15", status: "Disconnected" },
-  { id: 16, name: "Player 16", status: "Not Ready" },
-  { id: 17, name: "Player 17", status: "Ready" },
-  { id: 18, name: "Player 18", status: "Disconnected" },
-  { id: 19, name: "Player 19", status: "Not Ready" },
-  { id: 20, name: "Player 20", status: "Ready" },
-  { id: 21, name: "Player 21", status: "Not Ready" },
-  { id: 22, name: "Player 22", status: "Ready" },
-  { id: 23, name: "Player 23", status: "Disconnected" },
-  { id: 24, name: "Player 24", status: "Ready" },
-  { id: 25, name: "Player 25", status: "Not Ready" },
-  { id: 26, name: "Player 26", status: "Ready" },
-  { id: 27, name: "Player 27", status: "Disconnected" },
-  { id: 28, name: "Player 28", status: "Not Ready" },
-  { id: 29, name: "Player 29", status: "Ready" },
-  { id: 30, name: "Player 30", status: "Disconnected" },
-  { id: 31, name: "Player 31", status: "Ready" },
-  { id: 32, name: "Player 32", status: "Not Ready" },
-  { id: 33, name: "Player 33", status: "Ready" },
-  { id: 34, name: "Player 34", status: "Disconnected" },
-  { id: 35, name: "Player 35", status: "Ready" },
-  { id: 36, name: "Player 36", status: "Not Ready" },
-  { id: 37, name: "Player 37", status: "Disconnected" },
-  { id: 38, name: "Player 38", status: "Ready" },
-  { id: 39, name: "Player 39", status: "Not Ready" },
-  { id: 40, name: "Player 40", status: "Ready" },
-];
-
-const initialPoolsState = {
-  A: { players: [], status: 'Not Started' },
-  B: { players: [], status: 'Not Started' },
-  C: { players: [], status: 'Not Started' },
-  D: { players: [], status: 'Not Started' },
-  E: { players: [], status: 'Not Started' }
-};
-
+import { collection, doc, getDoc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { db } from '@/firebaseDB';
+import { calculateDinersRoundScores, calculateUBARoundScores } from '@/lib/roundScores';
+// import { db } from '@/firebase';
 const QueueScreen = ({ gameType }) => {
   const [queue, setQueue] = useState([]);
-  const [pools, setPools] = useState(initialPoolsState);
+  const [pools, setPools] = useState({});
   const [history, setHistory] = useState([]);
-  const [isInitialized, setIsInitialized] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState([]);
   const [isSelecting, setIsSelecting] = useState(false);
-  const POOL_SIZE = 12;
+  const [started, setStarted] = useState(false)
 
-  // Load state on mount
   useEffect(() => {
-    const loadState = () => {
-      // Load shared state
-      const savedState = localStorage.getItem('gameState');
-      if (savedState) {
-        const { queue: savedQueue, pools: savedPools, history: savedHistory } = JSON.parse(savedState);
-        if (savedQueue) setQueue(savedQueue);
-        if (savedPools) setPools(savedPools);
-        if (savedHistory) setHistory(savedHistory);
-      } else {
-        setQueue(mockQueue);
-        setPools(initialPoolsState);
+    const docRef = doc(db, 'IGTS', 'Queue');
+    const startedRef = doc(db, 'IGTS', 'started');
+    let s=false;
+    const unsubscribeStarted = onSnapshot(startedRef, (docSnap) => {
+      if(docSnap){
+        setStarted(docSnap.data().started)
+        s=docSnap.data().started
       }
-    };
+    })
+    let unsubscribe ;
+    if(s){
+      // updated local state from pools state here
+    }else{
+     unsubscribe = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (Array.isArray(data.users)) {
+            const emailQueue = data.users.map((email) => ({
+              id: email,
+              name: email,
+              status: 'Not Ready'
+            }));
+            setQueue(emailQueue);
+          } else {
+            console.error('Users data is not in expected format.');
+            setQueue([]);
+          }
+        } else {
+          console.log('Queue document does not exist.');
+          setQueue([]);
+        }
+      });
+    }
 
-    loadState();
-    setIsInitialized(true);
+    return () => {
+      unsubscribe()
+      unsubscribeStarted()
+    };
   }, []);
 
-  // Save state whenever it changes
-  useEffect(() => {
-    if (!isInitialized) return;
+  const saveToHistory = useCallback(() => {
+    setHistory((prev) => [...prev, { queue: [...queue], pools: JSON.parse(JSON.stringify(pools)) }]);
+  }, [queue, pools]);
 
-    localStorage.setItem('gameState', JSON.stringify({
-      queue,
-      pools,
-      history
-    }));
-  }, [queue, pools, history, isInitialized]);
+  const handleUndo = () => {
+    if (history.length < 2) return; // Ensure at least two states exist to go back properly
+  
+    if (window.confirm('Are you sure you want to Undo?')) {
+      const previousState = history[history.length - 2]; // Get the second last state
+  
+      setQueue(previousState.queue);
+      setPools(previousState.pools);
+  
+      // Remove the last two history entries
+      setHistory((prev) => prev.slice(0, -2));
+    }
+  };
+  
+
+  // const handleUndo = () => {
+  //   if (history.length > 0 && window.confirm('Are you sure you want to Undo?')) {
+  //     const previousState = history[history.length - 1];
+  //     setQueue(previousState.queue);
+  //     setPools(previousState.pools);
+  //     setHistory(prev => prev.slice(0, -1));
+  //   }
+  // };
+
+  
+
+  const handleStartGame = async () => {
+    if (window.confirm('Are you sure you want to start the game?')) {
+      try {
+        // Iterate over each pool and update the user's pool in Firestore
+        for (const [poolName, pool] of Object.entries(pools)) {
+          for (const player of pool.players) {
+            const currentUserEmail = player.id; // Get the email of the player
+            if (!currentUserEmail) {
+              console.warn(`No email found for player in pool ${poolName}.`);
+              continue;
+            }
+  
+            // Reference to the user's document inside 'Users' collection in Firestore
+            const poolDocRef = doc(db, 'IGTS', 'Users', 'pool', currentUserEmail); // Using email as doc ID
+  
+            // Set the pool for the player in Firestore
+            await setDoc(poolDocRef, { pool: poolName });
+          }
+        }
+  
+        
+        // Reference to the game document in Firestore
+        const gameDocRef = doc(db, 'IGTS', gameType);
+        
+        for (const [poolName, pool] of Object.entries(pools)) {
+          const poolCollectionRef = collection(gameDocRef, `pool${poolName}`); // Collection for each pool
+          
+          
+          const usersDocRef = doc(poolCollectionRef, 'users'); // Document to store users
+          const inputDocRef = doc(poolCollectionRef, 'input'); // Document to store input
+          const scoreDocRef = doc(poolCollectionRef, 'score'); // Document to store score
+          const detailDocRef = doc(poolCollectionRef, 'details'); // Document to store details
+          
+          const playerEmails = pool.players.map(player => player.id); // Extract emails
+          const numUsers = playerEmails.length; // Get number of users in the pool
+          
+          // Initialize input data based on game type
+          let inputData = {};
+          if (gameType === 'diners') {
+            inputData = {
+              round1: new Array(numUsers).fill(-1),
+              round2: new Array(numUsers).fill(-1),
+              round3: new Array(numUsers).fill(-1),
+            };
+            
+          } else if (gameType === 'uba') {
+            inputData = {
+              round1: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(0)])),
+              round2: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(0)])),
+              round3: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(0)])),
+            };
+            
+          }
+          
+          // Store users and input data in Firestore
+          await setDoc(usersDocRef, { users: playerEmails });
+          await setDoc(inputDocRef, inputData);
+          await setDoc(detailDocRef, {round: 1, status: false});
+
+
+          // Once all users' pools are updated, update the game status to "started"
+          const startedRef = doc(db, 'IGTS', 'started');
+          await updateDoc(startedRef, { started: true });
+        }
+  
+        alert('Game has started, pools assigned, and input initialized!');
+      } catch (error) {
+        console.error('Error starting the game:', error);
+        alert('Failed to start the game. Please try again.');
+      }
+    }
+  };
+  
+  
 
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset? All players will return to the waiting queue.')) {
-      // Get all players from pools
-      const allPlayers = Object.values(pools)
-        .flatMap(pool => pool.players || []);
-      
-      // Reset to initial state with all players in queue
-      setQueue([...mockQueue]);
-      setPools(initialPoolsState);
+      // Collect all players from the pools and put them back in the queue
+      const allPlayersFromPools = Object.values(pools).reduce((acc, pool) => {
+        return [...acc, ...pool.players];
+      }, []);
+  
+      // Set the queue with the players from both the existing queue and the players from pools
+      setQueue((prevQueue) => [...prevQueue, ...allPlayersFromPools]);
+  
+      // Reset the pools and history
+      setPools({});
       setHistory([]);
-      
-      // Update localStorage
-      localStorage.setItem('gameState', JSON.stringify({
-        queue: mockQueue,
-        pools: initialPoolsState,
-        history: []
-      }));
     }
   };
+  
 
-  const saveToHistory = useCallback(() => {
-    setHistory(prev => [
-      ...prev,
-      {
-        queue: [...queue], // Deep copy of the queue
-        pools: JSON.parse(JSON.stringify(pools)) // Deep copy of pools
+  const handleEndGame = async () => {
+    if (window.confirm('Are you sure you want to end the game?')) { 
+      try {
+        const startedRef = doc(db, 'IGTS', 'started');
+        await updateDoc(startedRef, { started: false });
+        console.log("Game ended successfully!");
+      }catch (error) {
+        console.error('Error ending the game:', error);
+        alert('Failed to end the game. Please try again.');
       }
-    ]);
-  }, [queue, pools]);
-  
-  const handleUndo = () => {
-    if (history.length > 0 && window.confirm('Are you sure you want to Undo?')) {
-      const previousState = history[history.length - 1];
-  
-      // Restore queue and pools with new copies
-      setQueue([...previousState.queue]); // ✅ New array
-      setPools(JSON.parse(JSON.stringify(previousState.pools))); // ✅ New deep copy
-  
-      // Remove the last history entry
-      setHistory(prev => prev.slice(0, -1));
     }
+  }
+
+        
+
+  const createPool = () => {
+    saveToHistory();
+  
+    // Change the pool name generation to use numbers instead of letters
+    let poolName = (Object.keys(pools).length + 1).toString(); // 1, 2, 3, ...
+    setPools((prevPools) => ({
+      ...prevPools,
+      [poolName]: { players: [], status: 'Not Started' }
+    }));
   };
   
-  const allotPlayers = () => {
-    if (queue.length < POOL_SIZE) return;
-  
-    saveToHistory(); // Save state BEFORE changes
-    let players = [...queue];
-    const newPools = JSON.parse(JSON.stringify(pools)); // Deep copy pools
-  
-    let poolName = 'A';
-    while (players.length > 0 && poolName <= 'E') {
-      const remainingSlots = POOL_SIZE - newPools[poolName].players.length;
-  
-      if (remainingSlots > 0) {
-        const poolPlayers = players.splice(0, remainingSlots);
-        newPools[poolName].players = [...newPools[poolName].players, ...poolPlayers];
-        newPools[poolName].status = checkPoolStatus(newPools[poolName], POOL_SIZE);
-      }
-  
-      poolName = String.fromCharCode(poolName.charCodeAt(0) + 1);
-    }
-  
-    setPools(newPools);
-    setQueue(players);
-  };
-
-  const getColor = (status) => {
-    
-    switch (status) {
-      case 'Ready':
-        return 'bg-green-100';
-      case 'Not Ready':
-        return 'bg-blue-200';
-      case 'Disconnected':
-        return 'bg-red-100';
-      default:
-        return 'bg-gray-200';
-    }
-  };
-
-  const manualReadyPool = (poolName) => {
-    const newPools = { ...pools };
-    newPools[poolName].status = 'Ready';
-
-    setPools(newPools);
-  };
-
-  const checkPoolStatus = (pool, poolsize) => {
-    if (pool.status === 'Ready') {
-      return 'Ready';
-    }
-    if (pool.players.length !== poolsize) {
-      return 'Not Started';
-    }
-    return pool.players.every((player) => player.status === 'Ready') ? 'Ready' : 'Not Ready';
-  };
-
-  // Select and drop
 
   const toggleSelect = () => {
     setIsSelecting((prev) => !prev);
   };
 
   const handleSelectPlayer = (playerId) => {
-    if(!isSelecting) return;
+    if (!isSelecting) return;
     setSelectedPlayers((prevSelected) =>
       prevSelected.includes(playerId) ? prevSelected.filter((id) => id !== playerId) : [...prevSelected, playerId]
     );
@@ -206,138 +214,166 @@ const QueueScreen = ({ gameType }) => {
 
   const handleDropPlayersToPool = (poolName) => {
     if (selectedPlayers.length === 0) return;
-  
+
     saveToHistory();
-  
-    // Create deep copies of state
-    const currentQueue = [...queue];
-    const currentPools = JSON.parse(JSON.stringify(pools));
-  
-    // Filter players from queue
-    const selectedFromQueue = currentQueue.filter(player => 
-      selectedPlayers.includes(player.id)
-    );
-    const remainingQueue = currentQueue.filter(player => 
-      !selectedPlayers.includes(player.id)
-    );
-  
-    // Filter players from pools
-    const selectedFromPools = [];
-    Object.keys(currentPools).forEach(pool => {
-      currentPools[pool].players = currentPools[pool].players.filter(player => {
+
+    let selectedFromQueue = queue.filter((player) => selectedPlayers.includes(player.id));
+    let selectedFromPools = [];
+    let updatedPools = { ...pools };
+
+    Object.keys(updatedPools).forEach((pool) => {
+      updatedPools[pool].players = updatedPools[pool].players.filter((player) => {
         if (selectedPlayers.includes(player.id)) {
           selectedFromPools.push(player);
           return false;
         }
         return true;
       });
-      currentPools[pool].status = checkPoolStatus(currentPools[pool], POOL_SIZE);
     });
-  
-    const allSelected = [...selectedFromQueue, ...selectedFromPools];
-    
-    // Check capacity with current pool state
-    const targetPool = currentPools[poolName];
-    if (targetPool.players.length + allSelected.length <= POOL_SIZE) {
-      targetPool.players = [...targetPool.players, ...allSelected];
-      targetPool.status = checkPoolStatus(targetPool, POOL_SIZE);
-      
-      // Update states with new copies
-      setPools(currentPools);
-      setQueue(remainingQueue);
-      setSelectedPlayers([]);
-    } else {
-      alert(`Pool ${poolName} is full or doesn't have enough space.`);
-    }
-  
+
+    let remainingQueue = queue.filter((player) => !selectedPlayers.includes(player.id));
+
+    updatedPools[poolName].players = [...updatedPools[poolName].players, ...selectedFromQueue, ...selectedFromPools];
+
+    setQueue(remainingQueue);
+    setPools(updatedPools);
+    setSelectedPlayers([]);
     toggleSelect();
   };
-  
+
   const handleDropPlayersToQueue = () => {
     if (selectedPlayers.length === 0) return;
-  
+
     saveToHistory();
-  
-    // Create deep copies of state
-    const currentPools = JSON.parse(JSON.stringify(pools));
-    const selectedFromPools = [];
-  
-    // Remove players from pools
-    Object.keys(currentPools).forEach(pool => {
-      currentPools[pool].players = currentPools[pool].players.filter(player => {
+
+    let selectedFromPools = [];
+    let updatedPools = { ...pools };
+
+    Object.keys(updatedPools).forEach((pool) => {
+      updatedPools[pool].players = updatedPools[pool].players.filter((player) => {
         if (selectedPlayers.includes(player.id)) {
           selectedFromPools.push(player);
           return false;
         }
         return true;
       });
-      currentPools[pool].status = checkPoolStatus(currentPools[pool], POOL_SIZE);
     });
-  
-    // Update states with new copies
-    setQueue(prev => [...prev, ...selectedFromPools]);
-    setPools(currentPools);
+
+    setQueue((prevQueue) => [...prevQueue, ...selectedFromPools]);
+    setPools(updatedPools);
     setSelectedPlayers([]);
-  
     toggleSelect();
   };
+
+  // Updated function to allocate players to pools automatically
+  const handleAllocatePlayersToPools = () => {
+    if (queue.length === 0 || Object.keys(pools).length === 0) {
+      alert('No pools available to allocate players.');
+      return;
+    }
+
+    // Calculate the total available spots across all pools (each pool can hold up to 12 players)
+    const totalAvailableSlots = Object.values(pools).reduce((acc, pool) => acc + (12 - pool.players.length), 0);
+
+    // If the number of players exceeds the available spots, don't allocate any players
+    if (queue.length > totalAvailableSlots) {
+      alert('Not enough space in the current pools to accommodate all players.');
+      return;
+    }
+
+    saveToHistory();
+
+    let updatedPools = { ...pools };
+    let remainingPlayers = [...queue];
+
+    // Loop over pools and assign players without exceeding 12 in each pool
+    Object.keys(updatedPools).forEach((poolName) => {
+      if (remainingPlayers.length > 0 && updatedPools[poolName].players.length < 12) {
+        const poolSize = Math.min(12 - updatedPools[poolName].players.length, remainingPlayers.length);
+        updatedPools[poolName].players = [...updatedPools[poolName].players, ...remainingPlayers.slice(0, poolSize)];
+        remainingPlayers = remainingPlayers.slice(poolSize);
+      }
+    });
+
+    // If there are remaining players and no pools can accept more, show an alert
+    if (remainingPlayers.length > 0) {
+      alert('There are more players left than can be allocated to the current pools.');
+    }
+
+    setQueue([]);
+    setPools(updatedPools);
+  };
+
+  const handleCalculateScore = async (poolName) => {
+    let round=3;
+    if(gameType==='diners') await calculateDinersRoundScores(round, 'pool'+poolName);
+    else await calculateUBARoundScores(round, 'pool'+poolName);
+  }
 
   return (
     <div className="space-y-8">
       <div className="flex justify-end space-x-4">
+        {!started&&<div className='flex space-x-4'>
+
         <button 
           onClick={toggleSelect}
           className={`px-4 py-2 rounded-lg transition ${
-            isSelecting
-              ? "bg-green-600 hover:bg-green-700"
-              : "bg-gray-600 hover:bg-gray-700"
+            isSelecting ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 hover:bg-gray-700"
           } text-white`}
-        >
-          Select
+          >
+          {isSelecting ? "Cancel Select" : "Select Players"}
         </button>
-        <button
+        {/* <button
           onClick={handleUndo}
           disabled={history.length === 0}
-          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-        >
-          Undo Last Action
-        </button>
+          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 transition"
+          >
+          Undo
+          </button> */}
         <button
           onClick={handleReset}
           className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-        >
+          >
           Reset
         </button>
+        <button
+          onClick={handleAllocatePlayersToPools}
+          className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition"
+          >
+          Allocate Players 
+        </button>
+        <button
+        onClick={handleStartGame}
+        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+        >
+      Start Game
+      </button>
+        </div>}
+        {started && <button
+          onClick={handleEndGame}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+          >
+          End Game
+        </button>}
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold text-gray-800">Waiting Queue - {gameType?.toUpperCase()}</h2>
-        <div className="flex space-x-4">
-          <button 
-            onClick={() => handleDropPlayersToQueue()} 
-            className={`bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition ${
-              selectedPlayers.length === 0 ? "hidden" : ""
-            }`}
-          >
-            Drop Selected Players Here
-          </button>
-          <button 
-            onClick={allotPlayers} 
-            disabled={queue.length < POOL_SIZE} 
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-          >
-            Allot Players to Pools
-          </button>
-        </div>
-      </div>
+        <div className='flex space-x-2'>
 
+        <h2 className="text-2xl font-bold text-gray-800">Waiting Queue - {gameType?.toUpperCase()} : {queue.length}</h2>
+        <button
+          onClick={handleDropPlayersToQueue}
+          className={`bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition ${selectedPlayers.length === 0 ? "hidden" : ""}`}
+          >
+          Drop Selected Players Here
+        </button>
+          </div>
         <div className="flex flex-wrap gap-2 bg-gray-50 rounded-lg p-4">
           {queue.map((player) => (
             <span key={player.id} onClick={() => handleSelectPlayer(player.id)}
-            className={`px-3 py-1 rounded-full ${
-              selectedPlayers.includes(player.id) ? 'bg-green-400 text-white' : 'bg-blue-100 text-blue-800'
-            }`}>
+              className={`px-3 py-1 rounded-full cursor-pointer ${
+                selectedPlayers.includes(player.id) ? 'bg-green-400 text-white' : 'bg-blue-100 text-blue-800'
+              }`}>
               {player.name}
             </span>
           ))}
@@ -347,36 +383,29 @@ const QueueScreen = ({ gameType }) => {
       <div className="space-y-4">
         {Object.entries(pools).map(([poolName, pool]) => (
           <div key={poolName} className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">Pool {poolName}</h3>
-                <p className="text-gray-600">Players: {pool.players?.length || 0} / {POOL_SIZE}</p>
-              </div>
-              <div className="flex items-center ml-auto space-x-4">
-                <button
-                  onClick={() => handleDropPlayersToPool(poolName)}
-                  className={`bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition ${
-                    selectedPlayers.length === 0 ? "hidden" : ""
-                  }`}
-                >
-                  Drop Selected Players Here
-                </button>
-                <span className={`px-3 py-1 rounded-full text-sm bg-${getColor(pool.status)}-100 text-gray-800`}>
-                  {pool.status}
-                </span>
-                {pool.status === 'Not Ready' && (
-                  <button onClick={() => manualReadyPool(poolName)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                    Manual Ready
-                  </button>
-                )}
-              </div>
+            <div className='flex justify-between'>
+            <div className='flex space-x-2'>
+            <h3 className="text-xl font-bold text-gray-800">Pool {poolName} : <span> {pool.players.length}</span></h3>
+            <button
+              onClick={() => handleDropPlayersToPool(poolName)}
+              className={`bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition ${selectedPlayers.length === 0 ? "hidden" : ""}`}
+            >
+              Drop Selected Players Here
+            </button>
             </div>
-
+            {started&&<button
+              onClick={()=>handleCalculateScore(poolName)}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition"
+              >
+              Calculate Round Score 
+            </button>}
+                </div>
             <div className="flex flex-wrap gap-2 bg-gray-50 rounded-lg p-4">
-              {pool.players?.map((player) => (
+              {pool.players.map((player) => (
                 <span key={player.id} onClick={() => handleSelectPlayer(player.id)}
-                className={`${selectedPlayers.includes(player.id) ? 'bg-green-400 text-white' : `${getColor(player.status)} text-gray-800`} px-3 py-1 rounded-full`}
-                >
+                  className={`px-3 py-1 rounded-full cursor-pointer ${
+                    selectedPlayers.includes(player.id) ? 'bg-green-400 text-white' : 'bg-green-100 text-green-800'
+                  }`}>
                   {player.name}
                 </span>
               ))}
@@ -384,6 +413,14 @@ const QueueScreen = ({ gameType }) => {
           </div>
         ))}
       </div>
+      <button
+          onClick={createPool}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+        >
+          Create Pool
+      </button>
+      <br />
+      
     </div>
   );
 };

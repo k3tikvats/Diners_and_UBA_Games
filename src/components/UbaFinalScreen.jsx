@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { db } from '@/firebaseDB';
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import {
   Card,
   CardContent,
@@ -13,61 +15,121 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
 import IGTSlogo from "@/assets/images/IGTSlogo.png";
 
-const POOLS = ["Pool A", "Pool B", "Pool C", "Pool D", "Pool E"];
+const POOLS = ["pool1", "pool2", "pool3", "pool4", "pool5"];
 
-// Mock Final Data grouped by pools
-const mockFinalData = {
-  "Pool A": [
-    { name: "Sophia", email: "sophia@example.com", round1: 21, round2: 18, round3: 24 },
-    { name: "Liam", email: "liam@example.com", round1: 16, round2: 12, round3: 15 },
-    { name: "Olivia", email: "olivia@example.com", round1: 12, round2: 14, round3: 16 },
-    { name: "Noah", email: "noah@example.com", round1: 6, round2: 8, round3: 7 },
-    { name: "Emma", email: "emma@example.com", round1: 21, round2: 20, round3: 19 },
-    { name: "James", email: "james@example.com", round1: 15, round2: 12, round3: 13 },
-    { name: "Ava", email: "ava@example.com", round1: 24, round2: 20, round3: 22 },
-    { name: "William", email: "william@example.com", round1: 18, round2: 16, round3: 15 },
-    { name: "Charlotte", email: "charlotte@example.com", round1: 12, round2: 10, round3: 14 },
-    { name: "Lucas", email: "lucas@example.com", round1: 9, round2: 11, round3: 13 },
-    { name: "Mia", email: "mia@example.com", round1: 23, round2: 21, round3: 25 },
-    { name: "Ethan", email: "ethan@example.com", round1: 24, round2: 22, round3: 23 },
-  ],
-  "Pool B": [
-    { name: "Amelia", email: "amelia@example.com", round1: 13, round2: 12, round3: 15 },
-    { name: "Logan", email: "logan@example.com", round1: 18, round2: 16, round3: 14 },
-    { name: "Harper", email: "harper@example.com", round1: 12, round2: 14, round3: 16 },
-    { name: "Evelyn", email: "evelyn@example.com", round1: 10, round2: 11, round3: 13 },
-    { name: "Aiden", email: "aiden@example.com", round1: 21, round2: 20, round3: 19 },
-    { name: "Jackson", email: "jackson@example.com", round1: 15, round2: 13, round3: 12 },
-    { name: "Abigail", email: "abigail@example.com", round1: 14, round2: 15, round3: 13 },
-    { name: "Michael", email: "michael@example.com", round1: 13, round2: 14, round3: 15 },
-  ],
-  "Pool C": [],
-  "Pool D": [],
-  "Pool E": [],
-};
+// Memoized table headers
+const TABLE_HEADERS = [
+  { id: "name", label: "Name" },
+  { id: "email", label: "Email" },
+  { id: "round1", label: "Round 1 Score" },
+  { id: "round2", label: "Round 2 Score" },
+  { id: "round3", label: "Round 3 Score" },
+  { id: "total", label: "Total Score" },
+];
 
 const UbaFinalScreen = () => {
-  const [selectedPool, setSelectedPool] = useState("Pool A");
+  
+  const [selectedPool, setSelectedPool] = useState("pool1");
+  const [finalData, setFinalData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const finalDataWithTotal = (data) =>
-    data.map((player) => ({
-      ...player,
-      total: player.round1 + player.round2 + player.round3,
-    }));
 
-  const tableHeaders = [
-    { id: "name", label: "Name" },
-    { id: "email", label: "Email" },
-    { id: "round1", label: "Round 1 Score" },
-    { id: "round2", label: "Round 2 Score" },
-    { id: "round3", label: "Round 3 Score" },
-    { id: "total", label: "Total Score" },
-  ];
+  // Memoized fetch function
+  const fetchFinalData = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Batch fetch all documents at once
+      const docRef = doc(db, 'IGTS', 'uba'); // Ensure correct path
+      const docSnap = getDoc(docRef) // Ensure correct path
+      const collectionsSnapshot = await docSnap.listCollections();
 
-  const filteredPlayers = mockFinalData[selectedPool] || [];
+      for (const subColRef of collectionsSnapshot) {
+        console.log('Subcollection:', subColRef);
+      }
+
+
+
+      const poolRef = collection(db, 'IGTS', 'uba', selectedPool);
+      const [detailsDoc, finalScoresDoc, scoresDoc, usersDoc] = await Promise.all([
+        getDoc(doc(poolRef, 'details')),
+        getDoc(doc(poolRef, 'finalScores')),
+        getDoc(doc(poolRef, 'scores')),
+        getDoc(doc(poolRef, 'users'))
+      ]);
+
+      const users = usersDoc.exists() ? usersDoc.data().users || [] : [];
+      const finalScores = finalScoresDoc.exists() ? finalScoresDoc.data().finalScores || [] : [];
+      const scores = scoresDoc.exists() ? scoresDoc.data() : {};
+
+      // Process data in batch
+      const playerData = new Array(users.length);
+      for (let i = 0; i < users.length; i++) {
+        playerData[i] = {
+          name: `User ${i + 1}`,
+          email: users[i],
+          round1: scores.round1?.[i] || 0,
+          round2: scores.round2?.[i] || 0,
+          round3: scores.round3?.[i] || 0,
+          total: finalScores[i] || 0,
+        };
+      }
+
+      setFinalData(playerData);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedPool]);
+
+  useEffect(() => {
+    fetchFinalData();
+  }, [fetchFinalData]);
+
+  // Memoized table component
+  const TableComponent = useMemo(() => (
+    <Table className="table-auto border-collapse border border-gray-300 w-full">
+      <TableHeader>
+        <TableRow className="bg-purple-200">
+          {TABLE_HEADERS.map(header => (
+            <TableHead
+              key={header.id}
+              className="text-sm text-purple-900 font-semibold border border-gray-300"
+            >
+              {header.label}
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {finalData.map((player, index) => (
+          <TableRow key={index} className="hover:bg-purple-100">
+            <TableCell className="text-sm text-gray-700 font-semibold border border-gray-300">
+              {player.name}
+            </TableCell>
+            <TableCell className="text-sm text-gray-700 font-semibold border border-gray-300">
+              {player.email}
+            </TableCell>
+            <TableCell className="text-sm text-center border border-gray-300">
+              {player.round1}
+            </TableCell>
+            <TableCell className="text-sm text-center border border-gray-300">
+              {player.round2}
+            </TableCell>
+            <TableCell className="text-sm text-center border border-gray-300">
+              {player.round3}
+            </TableCell>
+            <TableCell className="text-sm text-center font-bold border border-gray-300">
+              {player.total}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  ), [finalData]);
 
   return (
     <div className="bg-gradient-to-b from-purple-300 to-purple-500 min-h-screen text-purple-900 relative">
@@ -80,7 +142,6 @@ const UbaFinalScreen = () => {
         <h1 className="text-black text-2xl font-bold text-center mb-6">
           UNIQUE BID AUCTION - FINAL SCORES
         </h1>
-        {/* Pool Selection Buttons */}
         <div className="flex justify-start mb-6 space-x-3">
           {POOLS.map((pool) => (
             <button
@@ -96,53 +157,19 @@ const UbaFinalScreen = () => {
             </button>
           ))}
         </div>
-        {/* Final Scores Table */}
         <Card className="w-full bg-white backdrop-blur-sm rounded-lg shadow-md mt-6">
           <CardHeader className="text-center pb-2 bg-gradient-to-r from-purple-400 to-purple-600 rounded-t-lg">
             <CardTitle className="text-white text-lg font-bold">
-              {selectedPool} - FINAL SCORES
+              {selectedPool.toUpperCase()} - FINAL SCORES
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <Table className="table-auto border-collapse border border-gray-300 w-full">
-                <TableHeader>
-                  <TableRow className="bg-purple-200">
-                    {tableHeaders.map((header) => (
-                      <TableHead
-                        key={header.id}
-                        className="text-sm text-purple-900 font-semibold border border-gray-300"
-                      >
-                        {header.label}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {finalDataWithTotal(filteredPlayers).map((player, index) => (
-                    <TableRow key={index} className="hover:bg-purple-100">
-                      <TableCell className="text-sm text-gray-700 font-semibold border border-gray-300">
-                        {player.name}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-700 font-semibold border border-gray-300">
-                        {player.email}
-                      </TableCell>
-                      <TableCell className="text-sm text-center border border-gray-300">
-                        {player.round1}
-                      </TableCell>
-                      <TableCell className="text-sm text-center border border-gray-300">
-                        {player.round2}
-                      </TableCell>
-                      <TableCell className="text-sm text-center border border-gray-300">
-                        {player.round3}
-                      </TableCell>
-                      <TableCell className="text-sm text-center font-bold border border-gray-300">
-                        {player.total}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              {loading ? (
+                <div className="text-center py-4">Loading...</div>
+              ) : (
+                TableComponent
+              )}
             </div>
           </CardContent>
         </Card>

@@ -19,38 +19,13 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app)
+//export const auth = getAuth(app)
 //export const database = getDatabase(app)
 
-const provider = new GoogleAuthProvider();
+//const provider = new GoogleAuthProvider();
 
 
 export const fireStoreDB = getFirestore();
 
 
 // Function to log in with Google
-export const loginWithGoogle = async () => {
-    signInWithPopup(auth, provider)
-    .then((result) => {
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      const token = credential.accessToken;
-      const user = result.user;
-    localStorage.setItem("user", JSON.stringify(user));
-    }).catch((error) => {
-      const errorCode = error.code;
-      const errorMessage = error.message;
-      const email = error.customData.email;
-      const credential = GoogleAuthProvider.credentialFromError(error);
-    });
-};
-
-// Function to log out
-export const logout = async () => {
-  try {
-    await signOut(auth);
-    console.log("User logged out successfully");
-  } catch (error) {
-    console.error("Error during logout:", error.message);
-    throw error;
-  }
-};
