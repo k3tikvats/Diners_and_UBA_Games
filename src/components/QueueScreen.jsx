@@ -11,63 +11,18 @@ const QueueScreen = ({ gameType }) => {
   const [isSelecting, setIsSelecting] = useState(false);
   const [started, setStarted] = useState(false)
 
+ 
+
   useEffect(() => {
     const docRef = doc(db, 'IGTS', 'Queue');
     const startedRef = doc(db, 'IGTS', 'started');
-    let n=localStorage.getItem("poolsLength")
-    let st=localStorage.getItem("started")
-    const gameDocRef = doc(db, 'IGTS', gameType);
-    for(let i=1;i<=n;i++){
-      const poolCollectionRef = collection(gameDocRef, `pool${i}`); 
-      onSnapshot(poolCollectionRef,async(snap)=>{
-        //let input=snap.docs[2].data()
-        //let users=snap.docs[4].data().users
-        let r,input,users;
-        snap.docs.forEach((d)=>{
-          if(d.data().users){
-            users=d.data().users
-          }
-          if(d.data().round){
-            r=d.data().round
-          }
-          if(!input&&d.data().round1){
-            input=d.data()
-          }
-          //console.log(d.data())
-        })
-        
-        let p=pools
-          p[i]={
-            players:users.map((user,i)=>{
-              let sxxx=true;
-              if(gameType=="uba"){
-                let j=input[`round${r}`][i][0]
-                if(j==0){
-                  sxxx=false;
-                }
-              }
-              return{
-                id:user,
-                name:user,
-                status:sxxx,
-                round:r
-              }
-            })
-          }
-          if(st){
-            setPools(p)
-          }
-          
-        
-      })
-    }
 
-    
     let s=false;
     const unsubscribeStarted = onSnapshot(startedRef, async (docSnap) => {
       if(docSnap){
         setStarted(docSnap.data().started)
         s=docSnap.data().started
+        refresh()
       }
     })
     let unsubscribe ;
@@ -91,6 +46,7 @@ const QueueScreen = ({ gameType }) => {
           setQueue([]);
         }
       });
+      //refresh()
     
 
     return () => {
@@ -116,6 +72,59 @@ const QueueScreen = ({ gameType }) => {
       setHistory((prev) => prev.slice(0, -2));
     }
   };
+
+  async function refresh(){
+    let st=localStorage.getItem("started")
+    const gameDocRef = doc(db, 'IGTS', gameType);
+    let n=localStorage.getItem("poolsLength")
+    let p = { ...pools }
+    for(let i=1;i<=n;i++){
+      const poolCollectionRef = collection(gameDocRef, `pool${i}`); 
+      let snap=await getDocs(poolCollectionRef);
+        //let input=snap.docs[2].data()
+        //let users=snap.docs[4].data().users
+      let r,input,users;
+      snap.forEach((d)=>{
+        console.log(d.data())
+        if(d.data().users){
+          users=d.data().users
+        }
+        if(d.data().round){
+          r=d.data().round
+        }
+        if(!input&&d.data().round1){
+          input=d.data()
+        }
+        //console.log(d.data())
+      })
+      
+      p[i]={
+        players:users.map((user,i)=>{
+          let sxxx=true;
+          if(gameType=="uba"){
+            let j=input[`round${r}`][i][0]
+            if(j==0){
+              sxxx=false;
+            }
+          }
+          return{
+            id:user,
+            name:user,
+            status:sxxx,
+            round:r
+          }
+        })
+      }
+    }
+    if(st){
+      //console.log(p)
+
+      //some updates
+      setPools(p)
+    }
+  }
+
+  
   
 
   // const handleUndo = () => {
@@ -407,12 +416,21 @@ const QueueScreen = ({ gameType }) => {
       Start Game
       </button>
         </div>}
-        {started && <button
-          onClick={handleEndGame}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-          >
-          End Game
-        </button>}
+        {started && <div className='flex justify-between w-full'>
+            <button
+            onClick={refresh}
+            className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-600 transition"
+            >
+            Refresh
+          </button>
+            <button
+            onClick={handleEndGame}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+            >
+            End Game
+          </button>
+        </div>
+        }
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
