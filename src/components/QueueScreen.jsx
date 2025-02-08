@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { collection, doc, getDoc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebaseDB';
 import { calculateDinersRoundScores, calculateUBARoundScores } from '@/lib/roundScores';
 // import { db } from '@/firebase';
@@ -14,17 +14,64 @@ const QueueScreen = ({ gameType }) => {
   useEffect(() => {
     const docRef = doc(db, 'IGTS', 'Queue');
     const startedRef = doc(db, 'IGTS', 'started');
+    let n=localStorage.getItem("poolsLength")
+    let st=localStorage.getItem("started")
+    const gameDocRef = doc(db, 'IGTS', gameType);
+    for(let i=1;i<=n;i++){
+      const poolCollectionRef = collection(gameDocRef, `pool${i}`); 
+      onSnapshot(poolCollectionRef,async(snap)=>{
+        //let input=snap.docs[2].data()
+        //let users=snap.docs[4].data().users
+        let r,input,users;
+        snap.docs.forEach((d)=>{
+          if(d.data().users){
+            users=d.data().users
+          }
+          if(d.data().round){
+            r=d.data().round
+          }
+          if(!input&&d.data().round1){
+            input=d.data()
+          }
+          //console.log(d.data())
+        })
+        
+        let p=pools
+          p[i]={
+            players:users.map((user,i)=>{
+              let sxxx=true;
+              if(gameType=="uba"){
+                let j=input[`round${r}`][i][0]
+                if(j==0){
+                  sxxx=false;
+                }
+              }
+              return{
+                id:user,
+                name:user,
+                status:sxxx,
+                round:r
+              }
+            })
+          }
+          if(st){
+            setPools(p)
+          }
+          
+        
+      })
+    }
+
+    
     let s=false;
-    const unsubscribeStarted = onSnapshot(startedRef, (docSnap) => {
+    const unsubscribeStarted = onSnapshot(startedRef, async (docSnap) => {
       if(docSnap){
         setStarted(docSnap.data().started)
         s=docSnap.data().started
       }
     })
     let unsubscribe ;
-    if(s){
-      // updated local state from pools state here
-    }else{
+   
      unsubscribe = onSnapshot(docRef, (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
@@ -44,7 +91,7 @@ const QueueScreen = ({ gameType }) => {
           setQueue([]);
         }
       });
-    }
+    
 
     return () => {
       unsubscribe()
@@ -86,6 +133,12 @@ const QueueScreen = ({ gameType }) => {
     if (window.confirm('Are you sure you want to start the game?')) {
       try {
         // Iterate over each pool and update the user's pool in Firestore
+        const queueRef = doc(db, 'IGTS', 'Queue');
+        setDoc(queueRef, { users: [] }); 
+        localStorage.setItem("poolsLength",Object.entries(pools).length)
+        localStorage.setItem("started",true)
+        console.log(pools)
+
         for (const [poolName, pool] of Object.entries(pools)) {
           for (const player of pool.players) {
             const currentUserEmail = player.id; // Get the email of the player
@@ -178,8 +231,11 @@ const QueueScreen = ({ gameType }) => {
     if (window.confirm('Are you sure you want to end the game?')) { 
       try {
         const startedRef = doc(db, 'IGTS', 'started');
+        localStorage.removeItem("poolsLength")
+        localStorage.removeItem("started")
         await updateDoc(startedRef, { started: false });
         console.log("Game ended successfully!");
+
       }catch (error) {
         console.error('Error ending the game:', error);
         alert('Failed to end the game. Please try again.');
@@ -196,7 +252,7 @@ const QueueScreen = ({ gameType }) => {
     let poolName = (Object.keys(pools).length + 1).toString(); // 1, 2, 3, ...
     setPools((prevPools) => ({
       ...prevPools,
-      [poolName]: { players: [], status: 'Not Started' }
+      [poolName]: { players: [], status: false,round:1 }
     }));
   };
   
@@ -302,6 +358,8 @@ const QueueScreen = ({ gameType }) => {
 
     setQueue([]);
     setPools(updatedPools);
+    console.log(queue)
+      console.log(updatedPools)
   };
 
   const handleCalculateScore = async (poolName) => {
@@ -404,8 +462,8 @@ const QueueScreen = ({ gameType }) => {
               {pool.players.map((player) => (
                 <span key={player.id} onClick={() => handleSelectPlayer(player.id)}
                   className={`px-3 py-1 rounded-full cursor-pointer ${
-                    selectedPlayers.includes(player.id) ? 'bg-green-400 text-white' : 'bg-green-100 text-green-800'
-                  }`}>
+                    selectedPlayers.includes(player.id) ? 'bg-yellow-200 text-black' : ((player.status)?'bg-green-100 text-green-800':'bg-red-100 text-red-800')
+                  } `}>
                   {player.name}
                 </span>
               ))}
