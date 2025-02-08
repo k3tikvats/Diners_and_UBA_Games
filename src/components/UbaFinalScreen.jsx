@@ -41,14 +41,14 @@ const UbaFinalScreen = () => {
     try {
       setLoading(true);
       
-      // Batch fetch all documents at once
-      const docRef = doc(db, 'IGTS', 'uba'); // Ensure correct path
-      const docSnap = getDoc(docRef) // Ensure correct path
-      const collectionsSnapshot = await docSnap.listCollections();
+      // // Batch fetch all documents at once
+      // const docRef = doc(db, 'IGTS', 'uba'); // Ensure correct path
+      // const docSnap = getDoc(docRef) // Ensure correct path
+      // const collectionsSnapshot = await docSnap.listCollections();
 
-      for (const subColRef of collectionsSnapshot) {
-        console.log('Subcollection:', subColRef);
-      }
+      // for (const subColRef of collectionsSnapshot) {
+      //   console.log('Subcollection:', subColRef);
+      // }
 
 
 
