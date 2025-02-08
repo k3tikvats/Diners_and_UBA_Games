@@ -113,8 +113,8 @@ const QueueScreen = ({ gameType }) => {
             }
           }else{
             if(r<4){
-              let j=input[`round${r}`][i][0]
-              if(j==0){
+              let j=input[`round${r}`][i]
+              if(j==-1){
                 sxxx=false;
               }
             }else{
