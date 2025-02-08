@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import IGTSlogo from "@/assets/images/IGTSlogo.png";
 
-const POOLS = ["pool1", "pool2", "pool3", "pool4", "pool5"];
+const POOLS = ["Pool A", "Pool B", "Pool C", "Pool D", "Pool E"];
 
 // Memoized table headers
 const TABLE_HEADERS = [
@@ -31,13 +31,16 @@ const TABLE_HEADERS = [
 
 const UbaFinalScreen = () => {
   
-  const [selectedPool, setSelectedPool] = useState("pool1");
+  const [selectedPool, setSelectedPool] = useState("Pool A");
   const [finalData, setFinalData] = useState([]);
   const [loading, setLoading] = useState(true);
 
-
+  const getPoolDocument = (poolName) => {
+    const poolIndex = POOLS.indexOf(poolName) + 1;    // Convert "Pool A" -> "pool1", "Pool B" -> "pool2"
+    return `pool${poolIndex}`;
+  };
   // Memoized fetch function
-  const fetchFinalData = useCallback(async () => {
+  const fetchFinalData = useCallback(async (pool) => {
     try {
       setLoading(true);
       
@@ -51,8 +54,12 @@ const UbaFinalScreen = () => {
       // }
 
 
+      const poolDoc = getPoolDocument(pool);
+      console.log(`Fetching data for pool: ${pool}`);
+      console.log(`Resolved Firestore path: IGTS/diners/${poolDoc}/input`);
 
-      const poolRef = collection(db, 'IGTS', 'uba', selectedPool);
+
+      const poolRef = collection(db, 'IGTS', 'uba', poolDoc);
       const [detailsDoc, finalScoresDoc, scoresDoc, usersDoc] = await Promise.all([
         getDoc(doc(poolRef, 'details')),
         getDoc(doc(poolRef, 'finalScores')),
@@ -68,7 +75,7 @@ const UbaFinalScreen = () => {
       const playerData = new Array(users.length);
       for (let i = 0; i < users.length; i++) {
         playerData[i] = {
-          name: `User ${i + 1}`,
+          name: `Player ${i + 1}`,
           email: users[i],
           round1: scores.round1?.[i] || 0,
           round2: scores.round2?.[i] || 0,
@@ -86,11 +93,12 @@ const UbaFinalScreen = () => {
   }, [selectedPool]);
 
   useEffect(() => {
-    fetchFinalData();
+    fetchFinalData(selectedPool);
   }, [fetchFinalData]);
 
   // Memoized table component
   const TableComponent = useMemo(() => (
+    finalData.length>0?(
     <Table className="table-auto border-collapse border border-gray-300 w-full">
       <TableHeader>
         <TableRow className="bg-purple-200">
@@ -129,7 +137,9 @@ const UbaFinalScreen = () => {
         ))}
       </TableBody>
     </Table>
-  ), [finalData]);
+  ):(
+      <div className="text-center py-4">No data available</div>))
+    , [finalData]);
 
   return (
     <div className="bg-gradient-to-b from-purple-300 to-purple-500 min-h-screen text-purple-900 relative">
