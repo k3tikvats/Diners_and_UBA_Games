@@ -408,8 +408,10 @@ const QueueScreen = ({ gameType }) => {
   const handleNextRound = async (poolName) => {
     const detailsDocRef = doc(db, 'IGTS', gameType, "pool"+poolName, 'details');
     const detailsDoc = await getDoc(detailsDocRef);
+    let round=pools[poolName].round
     let details=detailsDoc.data()
     details.round=round+1;
+
     if (round === 3) {
         details.status=true;
     }
@@ -541,12 +543,12 @@ const QueueScreen = ({ gameType }) => {
           </div>
         ))}
       </div>
-      <button
+      {!started&&<button
           onClick={createPool}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
         >
           Create Pool
-      </button>
+      </button>}
       <br />
       
     </div>
