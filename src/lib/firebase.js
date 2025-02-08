@@ -52,7 +52,7 @@ const uploadData = async (game, pool, round, scoreData) => {
             finalScores = normalizeScores(finalScores);
         }
         await setDoc(finalScoresDocRef, { finalScores });
-        await setDoc(detailsDocRef, details);
+        //await setDoc(detailsDocRef, details);
 
     } catch (error) {
         console.error('Error uploading data:', error);

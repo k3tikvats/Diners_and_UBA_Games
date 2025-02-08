@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { collection, doc, getDoc, getDocs, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/firebaseDB';
 import { calculateDinersRoundScores, calculateUBARoundScores } from '@/lib/roundScores';
 // import { db } from '@/firebase';
@@ -11,63 +11,18 @@ const QueueScreen = ({ gameType }) => {
   const [isSelecting, setIsSelecting] = useState(false);
   const [started, setStarted] = useState(false)
 
+ 
+
   useEffect(() => {
     const docRef = doc(db, 'IGTS', 'Queue');
     const startedRef = doc(db, 'IGTS', 'started');
-    let n=localStorage.getItem("poolsLength")
-    let st=localStorage.getItem("started")
-    const gameDocRef = doc(db, 'IGTS', gameType);
-    for(let i=1;i<=n;i++){
-      const poolCollectionRef = collection(gameDocRef, `pool${i}`); 
-      onSnapshot(poolCollectionRef,async(snap)=>{
-        //let input=snap.docs[2].data()
-        //let users=snap.docs[4].data().users
-        let r,input,users;
-        snap.docs.forEach((d)=>{
-          if(d.data().users){
-            users=d.data().users
-          }
-          if(d.data().round){
-            r=d.data().round
-          }
-          if(!input&&d.data().round1){
-            input=d.data()
-          }
-          //console.log(d.data())
-        })
-        
-        let p=pools
-          p[i]={
-            players:users.map((user,i)=>{
-              let sxxx=true;
-              if(gameType=="uba"){
-                let j=input[`round${r}`][i][0]
-                if(j==0){
-                  sxxx=false;
-                }
-              }
-              return{
-                id:user,
-                name:user,
-                status:sxxx,
-                round:r
-              }
-            })
-          }
-          if(st){
-            setPools(p)
-          }
-          
-        
-      })
-    }
 
-    
     let s=false;
     const unsubscribeStarted = onSnapshot(startedRef, async (docSnap) => {
       if(docSnap){
         setStarted(docSnap.data().started)
         s=docSnap.data().started
+        refresh()
       }
     })
     let unsubscribe ;
@@ -91,6 +46,7 @@ const QueueScreen = ({ gameType }) => {
           setQueue([]);
         }
       });
+      //refresh()
     
 
     return () => {
@@ -116,6 +72,75 @@ const QueueScreen = ({ gameType }) => {
       setHistory((prev) => prev.slice(0, -2));
     }
   };
+
+  async function refresh(){
+    let st=localStorage.getItem("started")
+    const gameDocRef = doc(db, 'IGTS', gameType);
+    let n=localStorage.getItem("poolsLength")
+    let p = { ...pools }
+    for(let i=1;i<=n;i++){
+      const poolCollectionRef = collection(gameDocRef, `pool${i}`); 
+      let snap=await getDocs(poolCollectionRef);
+        //let input=snap.docs[2].data()
+        //let users=snap.docs[4].data().users
+      let r,input,users;
+      snap.forEach((d)=>{
+        console.log(d.data())
+        if(d.data().users){
+          users=d.data().users
+        }
+        if(d.data().round){
+          r=d.data().round
+        }
+        if(!input&&d.data().round1){
+          input=d.data()
+        }
+        //console.log(d.data())
+      })
+      let syyy=false;
+      p[i]={
+        players:users.map((user,i)=>{
+          let sxxx=true;
+          if(gameType=="uba"){
+            if(r<4){
+
+              let j=input[`round${r}`][i][0]
+              if(j==0){
+                sxxx=false;
+              }
+            }else{
+              syyy=true
+            }
+          }else{
+            if(r<4){
+              let j=input[`round${r}`][i]
+              if(j==-1){
+                sxxx=false;
+              }
+            }else{
+              syyy=true
+            }
+
+          }
+          return{
+            id:user,
+            status:sxxx,
+            name:user,
+          }
+        }),
+        status:syyy,
+        round:r
+      }
+    }
+    if(st){
+      console.log(p)
+
+      //some updates
+      setPools(p)
+    }
+  }
+
+  
   
 
   // const handleUndo = () => {
@@ -231,10 +256,18 @@ const QueueScreen = ({ gameType }) => {
     if (window.confirm('Are you sure you want to end the game?')) { 
       try {
         const startedRef = doc(db, 'IGTS', 'started');
+        const gameDocRef = doc(db, 'IGTS', gameType);
         localStorage.removeItem("poolsLength")
         localStorage.removeItem("started")
         await updateDoc(startedRef, { started: false });
-        console.log("Game ended successfully!");
+        let n=localStorage.getItem("poolsLength")
+        let p = { ...pools }
+        for(let i=1;i<=n;i++){
+          const poolCollectionRef = collection(gameDocRef, `pool${i}`); 
+          await updateDoc(poolCollectionRef,{});
+        }
+        
+        console.log("Game ended successfully!"); 
 
       }catch (error) {
         console.error('Error ending the game:', error);
@@ -363,9 +396,26 @@ const QueueScreen = ({ gameType }) => {
   };
 
   const handleCalculateScore = async (poolName) => {
-    let round=3;
-    if(gameType==='diners') await calculateDinersRoundScores(round, 'pool'+poolName);
-    else await calculateUBARoundScores(round, 'pool'+poolName);
+    let round=pools[poolName].round
+    try{ 
+      if(gameType==='diners') await calculateDinersRoundScores(round, 'pool'+poolName);
+      else await calculateUBARoundScores(round, 'pool'+poolName);
+      alert(`Successfully calculated! pool: ${poolName} round: ${round}`);
+    }catch{
+      alert(`Failurreeeeee! pool: ${poolName} round: ${round}`);
+    }
+  }
+  const handleNextRound = async (poolName) => {
+    const detailsDocRef = doc(db, 'IGTS', gameType, "pool"+poolName, 'details');
+    const detailsDoc = await getDoc(detailsDocRef);
+    let round=pools[poolName].round
+    let details=detailsDoc.data()
+    details.round=round+1;
+
+    if (round === 3) {
+        details.status=true;
+    }
+    await setDoc(detailsDocRef, details);
   }
 
   return (
@@ -407,12 +457,21 @@ const QueueScreen = ({ gameType }) => {
       Start Game
       </button>
         </div>}
-        {started && <button
-          onClick={handleEndGame}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-          >
-          End Game
-        </button>}
+        {started && <div className='flex justify-between w-full'>
+            <button
+            onClick={refresh}
+            className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-600 transition"
+            >
+            Refresh
+          </button>
+            <button
+            onClick={handleEndGame}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+            >
+            End Game
+          </button>
+        </div>
+        }
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
@@ -451,12 +510,25 @@ const QueueScreen = ({ gameType }) => {
               Drop Selected Players Here
             </button>
             </div>
-            {started&&<button
+            {started&&<div>Round:{pool.round}
+            </div>}
+            {started&&(!pool.status)&&<button
               onClick={()=>handleCalculateScore(poolName)}
               className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition"
               >
               Calculate Round Score 
             </button>}
+            {started&&(!pool.status)&&<button
+              onClick={()=>handleNextRound(poolName)}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+              >
+              Next Round
+            </button>}
+            {started&&(pool.status)&&<div
+              className="px-4 py-2  text-black rounded-lg"
+              >
+              Ended
+            </div>}
                 </div>
             <div className="flex flex-wrap gap-2 bg-gray-50 rounded-lg p-4">
               {pool.players.map((player) => (
@@ -471,12 +543,12 @@ const QueueScreen = ({ gameType }) => {
           </div>
         ))}
       </div>
-      <button
+      {!started&&<button
           onClick={createPool}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
         >
           Create Pool
-      </button>
+      </button>}
       <br />
       
     </div>
