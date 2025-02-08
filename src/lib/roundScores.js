@@ -28,24 +28,29 @@ async function calculateUBARoundScores(Round,Pool){
             arr[data[i][j]]++;
         }
     }
-    for(let i=1;i<30;i++){
+    for(let i=1;i<=30;i++){
         if(arr[i]==1){
             smallestunique=i;
             break;
         }
     }
 
-    for(let i=30;i>1;i--){
+    for(let i=30;i>=1;i--){
         if(arr[i]==1){
             highestunique=i;
             break;
         }
     }
+    let minuser=-1,maxiuser=-1;
     for(let i=0;i<Object.keys(data).length;i++){
+        if(data[i][0]==0) continue;
         for(let j=0;j<3;j++){
-            if(data[i][j]==smallestunique) scoresData[i]+=25000 - ((data[i][0]+data[i][1]+data[i][2])*1000)/3;
-            if(data[i][j]==highestunique) scoresData[i]+=50000 - ((data[i][0]+data[i][1]+data[i][2])*1000)/3;
+            if(data[i][j]==smallestunique) scoresData[i]+=25000 - ((data[i][0]+data[i][1]+data[i][2])*1000)/3,minuser=i;
+            if(data[i][j]==highestunique) scoresData[i]+=50000 - ((data[i][0]+data[i][1]+data[i][2])*1000)/3,maxiuser=i;   
         }
+    }
+    if(maxiuser===minuser&&maxiuser!=-1){
+        scoresData[minuser]+=((data[minuser][0]+data[minuser][1]+data[minuser][2])*1000)/3;
     }
     console.log(scoresData);
     await uploadData('uba',Pool,Round,scoresData);
