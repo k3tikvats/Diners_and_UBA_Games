@@ -47,7 +47,7 @@ const FinalScreen = () => {
         }
       }
       if(auth.currentUser==null||!valid){
-        navigate("/login")
+        //navigate("/login")
       }
     })
   },[])

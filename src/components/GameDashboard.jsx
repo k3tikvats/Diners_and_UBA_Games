@@ -24,7 +24,7 @@ const GameDashboard = () => {
         }
       }
       if(auth.currentUser==null||!valid){
-        navigate("/login")
+        //navigate("/login")
       }
     })
   },[])

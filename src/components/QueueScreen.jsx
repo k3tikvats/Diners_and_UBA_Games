@@ -161,6 +161,7 @@ const QueueScreen = ({ gameType }) => {
         const queueRef = doc(db, 'IGTS', 'Queue');
         setDoc(queueRef, { users: [] }); 
         localStorage.setItem("poolsLength",Object.entries(pools).length)
+        localStorage.setItem("poolsLength"+gameType,Object.entries(pools).length)
         localStorage.setItem("started",true)
         console.log(pools)
 
