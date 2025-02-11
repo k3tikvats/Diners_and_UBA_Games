@@ -160,8 +160,15 @@ const FinalScreen = () => {
   const navigate = useNavigate();
   const [finalScores, setFinalScores] = useState([]);
   const [selectedPool, setSelectedPool] = useState("pool1"); // Default pool
+  const [POOLS, setPOOLS] = useState(["pool1", "pool2", "pool3"])
 
   useEffect(() => {
+    let l=Number(localStorage.getItem("poolsLength"));
+    let p=[]
+    for (let i = 1; i <=l; i++) { 
+      p.push("pool"+i)
+    }
+    setPOOLS(p)
     const fetchFinalScores = async () => {
       try {
         console.log(`🔄 Fetching scores for ${selectedPool}`);
@@ -189,7 +196,7 @@ const FinalScreen = () => {
           name: `Player ${index + 1}`,
           ubaScore: ubaScores[index] || 0, 
           dinerScore: dinersScores[index] || 0,
-          total: (ubaScores[index] || 0) + (dinersScores[index] || 0),
+          total: ((ubaScores[index] || 0) + (dinersScores[index] || 0))/2,
         }));
     
         setFinalScores(formattedScores);
@@ -221,7 +228,7 @@ const FinalScreen = () => {
 
       {/* Pool Selection Buttons */}
       <div className="flex  space-x-4 mb-6">
-        {["pool1", "pool2", "pool3"].map((pool) => (
+        {POOLS.map((pool) => (
           <button
             key={pool}
             onClick={() => setSelectedPool(pool)}

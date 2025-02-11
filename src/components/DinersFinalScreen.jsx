@@ -354,19 +354,13 @@ const DinersFinalScreen = () => {
   const [loading, setLoading] = useState(true);
 
   const [POOLS, setPOOLS] = useState([])
-    const [data, setData] = useState(false)
     useEffect(()=>{
-      let l=localStorage.getItem("poolsLength")
-      if(!l){
-        setData(false)
-      }else{
+      let l=Number(localStorage.getItem("poolsLength"))
         let p=[]
         for(let i=0;i<l;i++){
           p.push("Pool "+String.fromCharCode(65+i))
         }
         setPOOLS(p)
-        setData(true)
-      }
     },[])
 
   const getPoolDocument = (poolName) => {
@@ -475,9 +469,7 @@ const DinersFinalScreen = () => {
       <div className="text-center py-4">No data available</div>))
     , [finalData]);
 
-    if(!data){
-      return <div>Game Not Started Yet</div>
-    }
+  
 
   return (
     <div className="bg-gradient-to-b from-purple-300 to-purple-500 min-h-screen text-purple-900 relative">
