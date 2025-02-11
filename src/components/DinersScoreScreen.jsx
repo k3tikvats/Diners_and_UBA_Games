@@ -137,16 +137,29 @@
 
 // export default DinersCurrentScoreScreen;
 
-import React, { useState, useEffect } from "react";
-import { db } from "../firebaseDB"; // Ensure correct Firebase setup
-import { collection,doc, getDoc } from "firebase/firestore";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import IGTSlogo from "@/assets/images/IGTSlogo.png";
-
+import { getDoc, collection, doc } from "firebase/firestore";
+import { db } from "@/firebaseDB";
 
 const POOLS = ["Pool A", "Pool B", "Pool C", "Pool D", "Pool E"];
+
 const TABLE_ROWS = [
   { id: "name", label: "Name" },
   { id: "email", label: "Email" },
@@ -154,163 +167,146 @@ const TABLE_ROWS = [
   { id: "score", label: "Score" },
 ];
 
-const DinersCurrentScoreScreen = () => {
+const DinersScoreScreen = () => {
   const [selectedPool, setSelectedPool] = useState("Pool A");
-  const [rounds, setRounds] = useState([1, 2, 3]); // Three rounds
-  const [players, setPlayers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [finalData, setFinalData] = useState({ round1: [], round2: [], round3: [] });
+  const [loading, setLoading] = useState(true);
 
-  // Convert Pool Name to Firestore Collection Name
+
   const getPoolDocument = (poolName) => {
-    const poolIndex = POOLS.indexOf(poolName) + 1; // Convert "Pool A" -> "pool1", "Pool B" -> "pool2"
+    const poolIndex = POOLS.indexOf(poolName) + 1;
     return `pool${poolIndex}`;
   };
- 
-  // Fetch Player Data from Firestore
-  useEffect(() => {
-    const fetchPlayers = async () => {
-      if (!selectedPool) {
-        console.warn("No pool selected.");
-        return;
-      }
-  
+
+  //Function to fetch data data from firestore
+  const fetchFinalData = useCallback(async (pool) => {
+    try {
       setLoading(true);
-      setError(null);
-  
-      try {
-        const poolDoc = getPoolDocument(selectedPool);
-        console.log(`Fetching data for pool: ${selectedPool}`);
-        console.log(`Resolved Firestore path: IGTS/diners/${poolDoc}/input`);
-  
-        const docRef = doc(db, "IGTS", "diners", poolDoc, "input");
-        console.log("Firestore document path:", docRef.path);
-        const userRef = doc(db, "IGTS", "diners", poolDoc, "users");
-        const docSnap = await getDoc(docRef);
-        const userSnap = await getDoc(userRef);
-        
-        
-        if (docSnap.exists()&&userSnap.exists()) {
-          const data = docSnap.data();
-          const userData = userSnap.data();
-          console.log(`Data for ${selectedPool}:`, data);
-          console.log(`user Data for ${selectedPool}:`, userData);
-          if (!data.round1 || !Array.isArray(data.round1)) {
-            console.warn(`Missing or invalid data in ${selectedPool}`);
-            setPlayers([]);
-            return;
-          }
-  
-          // Convert the data into a format the frontend expects
-          const formattedPlayers = Array.from({ length: 9 }, (_, i) => ({
-            name: `Player ${i + 1}`,
-            email: userData.users[i] ?? "N/A", 
-            order: data.round1[i] ?? "N/A", 
-            score: data.round2[i] ?? "N/A",
-          }));
-  
-          setPlayers(formattedPlayers);
-        } else {
-          console.warn(`No data found for ${selectedPool}`);
-          setPlayers([]);
-        }
-      } catch (err) {
-        console.error(`Error fetching data for ${selectedPool}:`, err);
-        setError("Failed to load data.");
-      }
+
+      const poolDoc = getPoolDocument(pool);
+      console.log(`Fetching data for pool: ${pool}`);
+      console.log(`Resolved Firestore path: IGTS/diners/${poolDoc}/input`);
+
+
+      const poolRef = collection(db, 'IGTS', 'diners', poolDoc);
+      const [inputDoc, scoresDoc, usersDoc] = await Promise.all([
+        getDoc(doc(poolRef, 'input')),
+        getDoc(doc(poolRef, 'scores')),
+        getDoc(doc(poolRef, 'users'))
+      ]);
+      const users = usersDoc.exists() ? usersDoc.data().users || [] : [];
+      const scores = scoresDoc.exists() ? scoresDoc.data() : {};
+      const input = inputDoc.exists() ? inputDoc.data() : {};
+
+      const extractRoundData = (round) =>
+        users.map((user, i) => ({
+          name: `Player ${i + 1}`,
+          email: user,
+          order: input[round]?.[0] || 0,
+          score: scores[round]?.[i] ?? null,
+        }));
+
+      setFinalData({
+        round1: extractRoundData("round1"),
+        round2: extractRoundData("round2"),
+        round3: extractRoundData("round3"),
+      });
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
       setLoading(false);
-    };
-  
-    fetchPlayers();
+    }
   }, [selectedPool]);
 
-  // Table Rendering Function
-  const renderTable = (roundNumber, playersData) => (
-    <Card className="w-full bg-white backdrop-blur-sm rounded-lg shadow-md mt-6">
-      <CardHeader className="text-center pb-2 bg-gradient-to-r from-purple-400 to-purple-600 rounded-t-lg">
-        <CardTitle className="text-white text-lg font-bold">
-          ROUND {roundNumber}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {playersData.length === 0 ? (
-          <p className="text-center text-gray-600">No data available</p>
+  useEffect(() => {
+    fetchFinalData(selectedPool);
+  }, [fetchFinalData]);
+
+const renderTable = (roundNumber, players) => (
+  <Card className="w-full bg-white backdrop-blur-sm rounded-lg shadow-md mt-6">
+    <CardHeader className="text-center pb-2 bg-gradient-to-r from-purple-400 to-purple-600 rounded-t-lg">
+      <CardTitle className="text-white text-lg font-bold">ROUND {roundNumber}</CardTitle>
+    </CardHeader>
+    <CardContent>
+      <div className="overflow-x-auto">
+        {players.length === 0 ? (  // Check if the players array is empty
+          <p className="text-center text-gray-500 font-semibold py-4">No data available</p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table className="table-auto border-collapse border border-gray-300 w-full">
-              <TableHeader>
-                <TableRow className="bg-purple-200">
-                  <TableHead className="text-sm text-purple-900 font-semibold border border-gray-300"></TableHead>
-                  {playersData.map((_, idx) => {
-  console.log(`Header Key: P${idx + 1}`); // Debugging statement
-  return (
-    <TableHead key={idx} className="text-sm text-purple-900 font-semibold border border-gray-300 text-center">
-      P{idx + 1}
-    </TableHead>
-  );
-})}
+          <Table className="table-auto border-collapse border border-gray-300 w-full">
+            <TableHeader>
+              <TableRow className="bg-purple-200">
+                <TableHead className="text-sm text-purple-900 font-semibold border border-gray-300"></TableHead>
+                {players.map((_, idx) => (
+                  <TableHead
+                    key={idx}
+                    className="text-sm text-purple-900 font-semibold border border-gray-300 text-center"
+                    style={{ minWidth: "80px" }}
+                  >
+                    P{idx + 1}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {TABLE_ROWS.map((row) => (
+                <TableRow key={row.id} className="hover:bg-purple-100">
+                  <TableCell className="text-sm text-gray-700 font-semibold border border-gray-300">{row.label}</TableCell>
+                  {players.map((player, idx) => (
+                    <TableCell
+                      key={idx}
+                      className="text-sm text-center border border-gray-300"
+                      style={{ minWidth: "80px" }}
+                    >
+                      {player[row.id] !== null && player[row.id] !== undefined && player[row.id] !== "" 
+                        ? player[row.id] 
+                       : "-"}
+                    </TableCell>
+                  ))}
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-              {TABLE_ROWS.map((row) => {
-  console.log(`Row Key: row-${row.id}`);  // Debugging statement
-  return (
-    <TableRow key={`row-${row.id}`} className="hover:bg-purple-100">
-      <TableCell className="text-sm text-gray-700 font-semibold border border-gray-300">
-        {row.label}
-      </TableCell>
-      {playersData.map((player, idx) => {
-        console.log(`Cell Key: ${row.id}-${player.email || player.id || idx}`);  // Debugging statement
-        return (
-          <TableCell key={`${row.id}-${player.email || player.id || idx}`} className="text-sm text-center border border-gray-300">
-            {player[row.id] || "-"}
-          </TableCell>
-        );
-      })}
-    </TableRow>
-  );
-})}
-              </TableBody>
-            </Table>
-          </div>
+              ))}
+            </TableBody>
+          </Table>
         )}
-      </CardContent>
-    </Card>
-  );
-  
-  
+      </div>
+    </CardContent>
+  </Card>
+);
+
+
   return (
     <div className="bg-gradient-to-b from-purple-300 to-purple-500 min-h-screen text-purple-900 relative">
-      <img src={IGTSlogo} alt="Background Logo" className="absolute inset-0 w-full h-full object-contain opacity-40 pointer-events-none" />
+      <img
+        src={IGTSlogo}
+        alt="Background Logo"
+        className="absolute inset-0 w-full h-full object-contain opacity-40 pointer-events-none"
+      />
       <div className="max-w-[1440px] mx-auto py-8 px-4 relative">
-        <h1 className="text-black text-2xl font-bold text-center mb-6">
-          DINER'S GAME - CURRENT SCORES
-        </h1>
+        <h1 className="text-black text-2xl font-bold text-center mb-6">DINER'S GAME - CURRENT SCORES</h1>
         <div className="flex justify-start mb-6 space-x-3">
           {POOLS.map((pool) => (
             <button
               key={pool}
-              onClick={() => setSelectedPool(pool)}
               className={`text-sm px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                 selectedPool === pool ? "bg-purple-700 text-white" : "bg-white text-purple-700 hover:bg-purple-300"
               }`}
+              onClick={() => setSelectedPool(pool)}
             >
               {pool}
             </button>
           ))}
         </div>
-        {loading ? (
-          <p className="text-center text-gray-700">Loading...</p>
-        ) : error ? (
-          <p className="text-center text-red-600">{error}</p>
-        ) : (
-          <div className="relative space-y-6">
-            {rounds.map((roundNumber) => renderTable(roundNumber, players))}
-          </div>
-        )}
+        <div className="relative space-y-6">
+            {loading ? (
+            <p className="text-center text-white">Loading...</p>
+            ) : (
+            [1, 2, 3].map((roundNumber) =>
+                renderTable(roundNumber, finalData[`round${roundNumber}`])
+              )
+            )}
+        </div>
       </div>
     </div>
   );
 };
 
-export default DinersCurrentScoreScreen;
+export default DinersScoreScreen;

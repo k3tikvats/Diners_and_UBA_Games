@@ -17,7 +17,7 @@ import IGTSlogo from "@/assets/images/IGTSlogo.png";
 import { getDoc, collection, doc } from "firebase/firestore";
 import { db } from "@/firebaseDB";
 
-const POOLS = ["pool1", "pool2", "pool3", "pool4", "pool5"];
+const POOLS = ["Pool A", "Pool B", "Pool C", "Pool D", "Pool E"];
 
 const TABLE_ROWS = [
   { id: "name", label: "Name" },
@@ -29,27 +29,39 @@ const TABLE_ROWS = [
 ];
 
 const UbaScoreScreen = () => {
-  const [selectedPool, setSelectedPool] = useState("pool1");
+  const [selectedPool, setSelectedPool] = useState("Pool A");
   const [finalData, setFinalData] = useState({ round1: [], round2: [], round3: [] });
   const [loading, setLoading] = useState(true);
 
-  const fetchFinalData = useCallback(async () => {
+
+  const getPoolDocument = (poolName) => {
+    const poolIndex = POOLS.indexOf(poolName) + 1;
+    return `pool${poolIndex}`;
+  };
+
+  //Function to fetch data data from firestore
+  const fetchFinalData = useCallback(async (pool) => {
     try {
       setLoading(true);
-      const poolRef = collection(db, 'IGTS', 'uba', selectedPool);
+
+      const poolDoc = getPoolDocument(pool);
+      console.log(`Fetching data for pool: ${pool}`);
+      console.log(`Resolved Firestore path: IGTS/diners/${poolDoc}/input`);
+
+
+      const poolRef = collection(db, 'IGTS', 'uba', poolDoc);
       const [inputDoc, scoresDoc, usersDoc] = await Promise.all([
         getDoc(doc(poolRef, 'input')),
         getDoc(doc(poolRef, 'scores')),
         getDoc(doc(poolRef, 'users'))
       ]);
-
       const users = usersDoc.exists() ? usersDoc.data().users || [] : [];
       const scores = scoresDoc.exists() ? scoresDoc.data() : {};
       const input = inputDoc.exists() ? inputDoc.data() : {};
 
       const extractRoundData = (round) =>
         users.map((user, i) => ({
-          name: `User ${i + 1}`,
+          name: `Player ${i + 1}`,
           email: user,
           bid1: input[round]?.[i]?.[0] || 0,
           bid2: input[round]?.[i]?.[1] || 0,
@@ -70,16 +82,19 @@ const UbaScoreScreen = () => {
   }, [selectedPool]);
 
   useEffect(() => {
-    fetchFinalData();
+    fetchFinalData(selectedPool);
   }, [fetchFinalData]);
 
-  const renderTable = (roundNumber, players) => (
-    <Card className="w-full bg-white backdrop-blur-sm rounded-lg shadow-md mt-6">
-      <CardHeader className="text-center pb-2 bg-gradient-to-r from-purple-400 to-purple-600 rounded-t-lg">
-        <CardTitle className="text-white text-lg font-bold">ROUND {roundNumber}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
+const renderTable = (roundNumber, players) => (
+  <Card className="w-full bg-white backdrop-blur-sm rounded-lg shadow-md mt-6">
+    <CardHeader className="text-center pb-2 bg-gradient-to-r from-purple-400 to-purple-600 rounded-t-lg">
+      <CardTitle className="text-white text-lg font-bold">ROUND {roundNumber}</CardTitle>
+    </CardHeader>
+    <CardContent>
+      <div className="overflow-x-auto">
+        {players.length === 0 ? (  // Check if the players array is empty
+          <p className="text-center text-gray-500 font-semibold py-4">No data available</p>
+        ) : (
           <Table className="table-auto border-collapse border border-gray-300 w-full">
             <TableHeader>
               <TableRow className="bg-purple-200">
@@ -112,10 +127,12 @@ const UbaScoreScreen = () => {
               ))}
             </TableBody>
           </Table>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        )}
+      </div>
+    </CardContent>
+  </Card>
+);
+
 
   return (
     <div className="bg-gradient-to-b from-purple-300 to-purple-500 min-h-screen text-purple-900 relative">
@@ -140,13 +157,13 @@ const UbaScoreScreen = () => {
           ))}
         </div>
         <div className="relative space-y-6">
-          {loading ? (
+            {loading ? (
             <p className="text-center text-white">Loading...</p>
-          ) : (
+            ) : (
             [1, 2, 3].map((roundNumber) =>
-              renderTable(roundNumber, finalData[`round${roundNumber}`])
-            )
-          )}
+                renderTable(roundNumber, finalData[`round${roundNumber}`])
+              )
+            )}
         </div>
       </div>
     </div>
