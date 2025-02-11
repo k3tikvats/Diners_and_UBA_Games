@@ -184,41 +184,53 @@ const QueueScreen = ({ gameType }) => {
         
         // Reference to the game document in Firestore
         const gameDocRef = doc(db, 'IGTS', gameType);
+        const gameDocRefUBA = doc(db, 'IGTS', 'uba');
+        const gameDocRefDiners = doc(db, 'IGTS', 'diners');
         
         for (const [poolName, pool] of Object.entries(pools)) {
-          const poolCollectionRef = collection(gameDocRef, `pool${poolName}`); // Collection for each pool
+          //const poolCollectionRef = collection(gameDocRef, `pool${poolName}`); // Collection for each pool
+          const poolCollectionRefDiners = collection(gameDocRefDiners, `pool${poolName}`); // Collection for each pool
+          const poolCollectionRefUBA = collection(gameDocRefUBA, `pool${poolName}`); // Collection for each pool
           
           
-          const usersDocRef = doc(poolCollectionRef, 'users'); // Document to store users
-          const inputDocRef = doc(poolCollectionRef, 'input'); // Document to store input
-          const scoreDocRef = doc(poolCollectionRef, 'score'); // Document to store score
-          const detailDocRef = doc(poolCollectionRef, 'details'); // Document to store details
+          const usersDocRefDiners = doc(poolCollectionRefDiners, 'users'); // Document to store users
+          const inputDocRefDiners = doc(poolCollectionRefDiners, 'input'); // Document to store input
+          const scoreDocRefDiners = doc(poolCollectionRefDiners, 'score'); // Document to store score
+          const detailDocRefDiners = doc(poolCollectionRefDiners, 'details'); // Document to store details
+
+          const usersDocRefUBA = doc(poolCollectionRefUBA, 'users'); // Document to store users
+          const inputDocRefUBA = doc(poolCollectionRefUBA, 'input'); // Document to store input
+          const scoreDocRefUBA = doc(poolCollectionRefUBA, 'score'); // Document to store score
+          const detailDocRefUBA = doc(poolCollectionRefUBA, 'details'); // Document to store details
           
           const playerEmails = pool.players.map(player => player.id); // Extract emails
           const numUsers = playerEmails.length; // Get number of users in the pool
           
           // Initialize input data based on game type
-          let inputData = {};
-          if (gameType === 'diners') {
-            inputData = {
+          let inputDataUBA = {};
+          let inputDataDiners = {};
+            inputDataDiners = {
               round1: new Array(numUsers).fill(-1),
               round2: new Array(numUsers).fill(-1),
               round3: new Array(numUsers).fill(-1),
             };
             
-          } else if (gameType === 'uba') {
-            inputData = {
+            inputDataUBA = {
               round1: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(0)])),
               round2: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(0)])),
               round3: Object.fromEntries([...Array(numUsers).keys()].map(i => [i, new Array(3).fill(0)])),
             };
             
-          }
           
           // Store users and input data in Firestore
-          await setDoc(usersDocRef, { users: playerEmails });
-          await setDoc(inputDocRef, inputData);
-          await setDoc(detailDocRef, {round: 1, status: false});
+          await setDoc(usersDocRefUBA, { users: playerEmails });
+          await setDoc(inputDocRefUBA, inputDataUBA);
+          await setDoc(detailDocRefUBA, {round: 1, status: false});
+
+          await setDoc(usersDocRefDiners, { users: playerEmails });
+          await setDoc(inputDocRefDiners, inputDataDiners);
+          await setDoc(detailDocRefDiners, {round: 1, status: false});
+          
 
 
           // Once all users' pools are updated, update the game status to "started"
