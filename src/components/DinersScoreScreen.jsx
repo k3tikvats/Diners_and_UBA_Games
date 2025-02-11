@@ -158,7 +158,7 @@ import IGTSlogo from "@/assets/images/IGTSlogo.png";
 import { getDoc, collection, doc } from "firebase/firestore";
 import { db } from "@/firebaseDB";
 
-const POOLS = ["Pool A", "Pool B", "Pool C", "Pool D", "Pool E"];
+//const POOLS = ["Pool A", "Pool B", "Pool C", "Pool D", "Pool E"];
 
 const TABLE_ROWS = [
   { id: "name", label: "Name" },
@@ -171,6 +171,26 @@ const DinersScoreScreen = () => {
   const [selectedPool, setSelectedPool] = useState("Pool A");
   const [finalData, setFinalData] = useState({ round1: [], round2: [], round3: [] });
   const [loading, setLoading] = useState(true);
+
+  const [POOLS, setPOOLS] = useState([])
+    const [data, setData] = useState(false)
+    useEffect(()=>{
+      let l=localStorage.getItem("poolsLength")
+      if(!l){
+        setData(false)
+      }else{
+        let p=[]
+        for(let i=0;i<l;i++){
+          p.push("Pool "+String.fromCharCode(65+i))
+        }
+        setPOOLS(p)
+        setData(true)
+      }
+    },[])
+
+    if(!data){
+      return <div>Game Not Started Yet</div>
+    }
 
 
   const getPoolDocument = (poolName) => {
