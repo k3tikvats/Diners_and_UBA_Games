@@ -1,5 +1,5 @@
 // src/components/GameDashboard.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import QueueScreen from './QueueScreen';
@@ -7,11 +7,27 @@ import UbaScoreScreen from './UbaScoreScreen';
 import DinersScoreScreen from './DinersScoreScreen';
 import UbaFinalScreen from './UbaFinalScreen';
 import DinersFinalScreen from './DinersFinalScreen';
+import { auth } from '@/firebaseDB';
 
 const GameDashboard = () => {
   const { gameType } = useParams();
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('queue');
+  const navigate = useNavigate();
+  useEffect(()=>{
+    auth.authStateReady().then(()=>{
+      let l=auth.currentUser.providerData
+      let valid=false;
+      for (let i = 0; i < l.length; i++) {
+        if(l[i].providerId=="password"){
+          valid=true;
+          break;
+        }
+      }
+      if(auth.currentUser==null||!valid){
+        navigate("/login")
+      }
+    })
+  },[])
 
   const renderContent = () => {
     if (gameType === 'uba') {

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 
 import IGTSlogo from "@/assets/images/IGTSlogo.png";
+import { auth } from '@/firebaseDB';
 
 // Mock Final Data 
 const mockFinalData = [
@@ -35,6 +36,21 @@ const mockFinalData = [
 
 const FinalScreen = () => {
   const navigate = useNavigate();
+  useEffect(()=>{
+    auth.authStateReady().then(()=>{
+      let l=auth.currentUser.providerData
+      let valid=false;
+      for (let i = 0; i < l.length; i++) {
+        if(l[i].providerId=="password"){
+          valid=true;
+          break;
+        }
+      }
+      if(auth.currentUser==null||!valid){
+        navigate("/login")
+      }
+    })
+  },[])
 
   const finalDataWithTotal = useMemo(() => 
     mockFinalData.map(player => ({
