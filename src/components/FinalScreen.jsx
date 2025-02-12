@@ -173,6 +173,11 @@ const FinalScreen = () => {
       try {
         console.log(`🔄 Fetching scores for ${selectedPool}`);
     
+        // Fetch Users
+        const userDocRef = doc(db, `IGTS/uba/${selectedPool}/users`);
+        const userDocSnap = await getDoc(userDocRef);
+        const userValues = userDocSnap.exists() ? userDocSnap.data().users : [];
+
         // Fetch UBA Scores
         const ubaDocRef = doc(db, `IGTS/uba/${selectedPool}/finalScores`);
         const ubaDocSnap = await getDoc(ubaDocRef);
@@ -193,7 +198,7 @@ const FinalScreen = () => {
        
         const formattedScores = Array.from({ length: maxPlayers }).map((_, index) => ({
           id: index,
-          name: `Player ${index + 1}`,
+          name: userValues[index] || 0, 
           ubaScore: ubaScores[index] || 0, 
           dinerScore: dinersScores[index] || 0,
           total: ((ubaScores[index] || 0) + (dinersScores[index] || 0))/2,

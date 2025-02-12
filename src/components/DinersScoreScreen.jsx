@@ -176,19 +176,20 @@ const DinersScoreScreen = () => {
 
     useEffect(()=>{
       let l=Number(localStorage.getItem("poolsLength"))
-   
+        console.log(l)
         let p=[]
         for(let i=0;i<l;i++){
           p.push("Pool "+String.fromCharCode(65+i))
         }
+        console.log(p)
         setPOOLS(p)
-
       
     },[])
 
   
   const getPoolDocument = (poolName) => {
     const poolIndex = POOLS.indexOf(poolName) + 1;
+    console.log(POOLS)
     return `pool${poolIndex}`;
   };
 
@@ -203,15 +204,15 @@ const DinersScoreScreen = () => {
 
 
       const poolRef = collection(db, 'IGTS', 'diners', poolDoc);
-      const [inputDoc, scoresDoc, usersDoc] = await Promise.all([
-        getDoc(doc(poolRef, 'input')),
-        getDoc(doc(poolRef, 'scores')),
-        getDoc(doc(poolRef, 'users'))
-      ]);
+ 
+      const inputDoc=await getDoc(doc(poolRef, 'input'));
+      const scoresDoc=await getDoc(doc(poolRef, 'scores'))
+      const usersDoc=await getDoc(doc(poolRef, 'users'))
       const users = usersDoc.exists() ? usersDoc.data().users || [] : [];
       const scores = scoresDoc.exists() ? scoresDoc.data() : {};
       const input = inputDoc.exists() ? inputDoc.data() : {};
-
+      console.log(users)
+      console.log(input)
       const extractRoundData = (round) =>
         users.map((user, i) => ({
           name: `Player ${i + 1}`,
@@ -219,12 +220,13 @@ const DinersScoreScreen = () => {
           order: input[round]?.[0] || 0,
           score: scores[round]?.[i] ?? null,
         }));
-
-      setFinalData({
+      let x={
         round1: extractRoundData("round1"),
         round2: extractRoundData("round2"),
         round3: extractRoundData("round3"),
-      });
+      }
+      setFinalData(x);
+      console.log(x)
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -233,8 +235,9 @@ const DinersScoreScreen = () => {
   }, [selectedPool]);
 
   useEffect(() => {
+    console.log("Selected Pool Changed:", selectedPool);
     fetchFinalData(selectedPool);
-  }, [fetchFinalData]);
+  }, [selectedPool]);
 
 const renderTable = (roundNumber, players) => (
   <Card className="w-full bg-white backdrop-blur-sm rounded-lg shadow-md mt-6">
