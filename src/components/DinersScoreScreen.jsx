@@ -217,7 +217,7 @@ const DinersScoreScreen = () => {
         users.map((user, i) => ({
           name: `Player ${i + 1}`,
           email: user,
-          order: input[round]?.[0] || 0,
+          order: input[round]?.[i] || 0,
           score: scores[round]?.[i] ?? null,
         }));
       let x={

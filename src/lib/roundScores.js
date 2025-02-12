@@ -3,19 +3,22 @@ import { getData,uploadData } from  "./firebase";
 
 async function calculateDinersRoundScores(Round,Pool){
     const data = await getData("diners", Pool, Round);
-    let scoresData=[];
-    let maxi=0,sum=0;
+    let scoresData=Array(data.length);
+    let maxi=0,sum=0,cnt=0;
     for(let i=0;i<data.length;i++){
+        if(data[i]==-1) continue;
         if(data[i]>maxi) maxi=data[i];
         sum+=data[i];
+        ++cnt;
     }
-    const avg=sum/data.length;
-    for(let i=0;i<data.length;i++){
-        scoresData[i]=data[i]-avg;
-        if(data[i]==maxi) scoresData[i]-=maxi/2;
+    if(cnt!=0){
+        const avg=sum/cnt;
+        for(let i=0;i<data.length;i++){
+            scoresData[i]=data[i]-avg;
+            if(data[i]==maxi) scoresData[i]-=maxi/2;
+        }
     }
     await uploadData('diners',Pool,Round,scoresData);
-    
 }
 
 async function calculateUBARoundScores(Round,Pool){

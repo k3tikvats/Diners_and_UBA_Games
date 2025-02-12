@@ -264,23 +264,35 @@ const QueueScreen = ({ gameType }) => {
     }
   };
   
+  const handleStartWithoutPoolGame = async () => {
+    if (window.confirm('Are you sure you want to start without creating?')) { 
+      try {
+        const startedRef = doc(db, 'IGTS', 'started');
+        await updateDoc(startedRef, { started: true });
+
+      }catch (error) {
+        console.error('Error ending the game:', error);
+        alert('Failed to end the game. Please try again.');
+      }
+    }
+  }
 
   const handleEndGame = async () => {
     if (window.confirm('Are you sure you want to end the game?')) { 
       try {
         const startedRef = doc(db, 'IGTS', 'started');
-        const gameDocRef = doc(db, 'IGTS', gameType);
-        localStorage.removeItem("poolsLength")
-        localStorage.removeItem("started")
+        // const gameDocRef = doc(db, 'IGTS', gameType);
+        // localStorage.removeItem("poolsLength")
+        // localStorage.removeItem("started")
         await updateDoc(startedRef, { started: false });
-        let n=localStorage.getItem("poolsLength")
-        let p = { ...pools }
-        for(let i=1;i<=n;i++){
-          const poolCollectionRef = collection(gameDocRef, `pool${i}`); 
-          await updateDoc(poolCollectionRef,{});
-        }
+        // let n=localStorage.getItem("poolsLength")
+        // let p = { ...pools }
+        // for(let i=1;i<=n;i++){
+        //   const poolCollectionRef = collection(gameDocRef, `pool${i}`); 
+        //   await updateDoc(poolCollectionRef,{});
+        // }
         
-        console.log("Game ended successfully!"); 
+        //console.log("Game ended successfully!"); 
 
       }catch (error) {
         console.error('Error ending the game:', error);
@@ -468,6 +480,12 @@ const QueueScreen = ({ gameType }) => {
         className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
         >
       Start Game
+      </button>
+        <button
+        onClick={handleStartWithoutPoolGame}
+        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+        >
+      Start Game Without Initilization
       </button>
         </div>}
         {started && <div className='flex justify-between w-full'>
