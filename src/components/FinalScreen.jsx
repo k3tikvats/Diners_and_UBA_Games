@@ -202,7 +202,7 @@ const FinalScreen = () => {
           ubaScore: ubaScores[index] || 0, 
           dinerScore: dinersScores[index] || 0,
           total: ((ubaScores[index] || 0) + (dinersScores[index] || 0))/2,
-        }));
+        })).sort((a,b)=>b.total - a.total);
     
         setFinalScores(formattedScores);
       } catch (error) {
