@@ -31,7 +31,7 @@ const UbaScoreScreen = () => {
   const [selectedPool, setSelectedPool] = useState("Pool A");
   const [finalData, setFinalData] = useState({ round1: [], round2: [], round3: [] });
   const [loading, setLoading] = useState(true);
-  //const POOLS = ["Pool A", "Pool B", "Pool C", "Pool D", "Pool E"];
+
   const [POOLS, setPOOLS] = useState([])
   useEffect(()=>{
     let l=Number(localStorage.getItem("poolsLength"))
@@ -100,7 +100,7 @@ const renderTable = (roundNumber, players) => (
     </CardHeader>
     <CardContent>
       <div className="overflow-x-auto">
-        {players.length === 0 ? (  // Check if the players array is empty
+        {players.length === 0 ? (
           <p className="text-center text-gray-500 font-semibold py-4">No data available</p>
         ) : (
           <Table className="table-auto border-collapse border border-gray-300 w-full">
@@ -169,7 +169,9 @@ const renderTable = (roundNumber, players) => (
             <p className="text-center text-white">Loading...</p>
             ) : (
             [1, 2, 3].map((roundNumber) =>
-                renderTable(roundNumber, finalData[`round${roundNumber}`])
+                <div key={roundNumber}>
+                    {renderTable(roundNumber, finalData[`round${roundNumber}`])}
+                </div>
               )
             )}
         </div>
