@@ -28,7 +28,7 @@ const TABLE_ROWS = [
 ];
 
 const UbaScoreScreen = () => {
-  const [selectedPool, setSelectedPool] = useState("Pool A");
+  const [selectedPool, setSelectedPool] = useState("Pool 0");
   const [finalData, setFinalData] = useState({ round1: [], round2: [], round3: [] });
   const [loading, setLoading] = useState(true);
   //const POOLS = ["Pool A", "Pool B", "Pool C", "Pool D", "Pool E"];

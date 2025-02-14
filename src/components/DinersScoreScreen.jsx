@@ -168,7 +168,7 @@ const TABLE_ROWS = [
 ];
 
 const DinersScoreScreen = () => {
-  const [selectedPool, setSelectedPool] = useState("Pool A");
+  const [selectedPool, setSelectedPool] = useState("Pool 0");
   const [finalData, setFinalData] = useState({ round1: [], round2: [], round3: [] });
   const [loading, setLoading] = useState(true);
 

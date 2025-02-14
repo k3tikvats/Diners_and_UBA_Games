@@ -349,7 +349,7 @@ const TABLE_HEADERS = [
 
 const DinersFinalScreen = () => {
   
-  const [selectedPool, setSelectedPool] = useState("Pool A");
+  const [selectedPool, setSelectedPool] = useState("Pool 0");
   const [finalData, setFinalData] = useState([]);
   const [loading, setLoading] = useState(true);
 
