@@ -46,7 +46,7 @@ const UbaFrequencyScreen = () => {
       count: 0
     }));
     
-    const bids = (roundInput || []).flat();
+    //const bids = (roundInput || []).flat();
     
     bids.forEach(bid => {
       if (bid >= 1 && bid <= 30) frequency[bid - 1].count += 1;
