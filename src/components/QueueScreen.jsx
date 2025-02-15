@@ -432,15 +432,21 @@ const QueueScreen = ({ gameType }) => {
   }
   const handleNextRound = async (poolName) => {
     const detailsDocRef = doc(db, 'IGTS', gameType, "pool"+poolName, 'details');
-    const detailsDoc = await getDoc(detailsDocRef);
-    let round=pools[poolName].round
-    let details=detailsDoc.data()
-    details.round=round+1;
+    try{
 
-    if (round === 3) {
+      const detailsDoc = await getDoc(detailsDocRef);
+      let round=pools[poolName].round
+      let details=detailsDoc.data()
+      details.round=round+1;
+      
+      if (round === 3) {
         details.status=true;
+      }
+      await setDoc(detailsDocRef, details);
+      alert(`Next round... pool: ${poolName} round: ${round}`);
+    }catch{
+      alert(`Failurreeeeee! pool: ${poolName} round: ${round}`);
     }
-    await setDoc(detailsDocRef, details);
   }
 
   return (
