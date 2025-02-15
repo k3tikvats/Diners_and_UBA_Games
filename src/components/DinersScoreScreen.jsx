@@ -244,9 +244,18 @@ const DinersScoreScreen = () => {
   }, [selectedPool]);
 
   const calculateAverageOrder = (players) => {
-    if (players.length === 0) return "-";
-    const totalOrder = players.reduce((sum, player) => sum + (player.order || 0), 0);
-    return (totalOrder / players.length).toFixed(2);
+    let count=0;
+    let totalOrder=0;
+    let n=Object.keys(players).length
+    for(let i=0;i<n;i++){
+      if(players[Object.keys(players)[i]].order>=0){
+        count++;
+        totalOrder+=players[Object.keys(players)[i]].order
+      }
+    }
+    if (count === 0) return "-";
+
+    return (totalOrder / count).toFixed(2);
   };
 
   const getHighestOrder = (players) => {
