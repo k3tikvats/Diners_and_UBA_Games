@@ -40,16 +40,16 @@ const UbaFrequencyScreen = () => {
     return `pool${poolIndex}`;
   };
 
-  const processBids = (bids) => {
+  const processBids = (bidsArray) => {
     const frequency = Array.from({ length: 30 }, (_, i) => ({
       bid: i + 1,
       count: 0
     }));
-    
-    const bids = (roundInput || []).flat();
-    
-    bids.forEach(bid => {
-      if (bid >= 1 && bid <= 30) frequency[bid - 1].count += 1;
+
+    bidsArray.forEach(bid => {
+      if (typeof bid === 'number' && bid >= 1 && bid <= 30) {
+        frequency[bid - 1].count += 1;
+      }
     });
 
     return [
@@ -57,8 +57,8 @@ const UbaFrequencyScreen = () => {
       frequency.slice(5, 10),
       frequency.slice(10, 15),
       frequency.slice(15, 20),
-      frequency.slice(20, 25), 
-      frequency.slice(25, 30)  
+      frequency.slice(20, 25),
+      frequency.slice(25, 30)
     ];
   };
 
@@ -71,8 +71,14 @@ const UbaFrequencyScreen = () => {
       const inputDoc = await getDoc(doc(poolRef, 'input'));
       const input = inputDoc.exists() ? inputDoc.data() : {};
 
-      const processRoundData = (round) => 
-        processBids(input[round] || []);
+      const processRoundData = (round) => {
+        const rawData = input[round] || {}; // Handle if round data is missing
+
+        // Correctly access participant bids.  Assumes input is { participantId: [round1bids], ... }
+        const bidsForRound = Object.values(rawData).flat().map(bid => Number(bid)).filter(bid => !isNaN(bid));
+
+        return processBids(bidsForRound);
+      };
 
       setFinalData({
         round1: processRoundData("round1"),
@@ -81,13 +87,17 @@ const UbaFrequencyScreen = () => {
       });
     } catch (error) {
       console.error("Error fetching data:", error);
+      alert("Error loading data. Please try again.");
+      setFinalData({ round1: [], round2: [], round3: [] });
     } finally {
       setLoading(false);
     }
   }, [selectedPool, POOLS]);
 
   useEffect(() => {
-    if (POOLS.length > 0) loadData();
+    if (POOLS.length > 0) {
+      loadData();
+    }
   }, [loadData, POOLS]);
 
   const renderFrequencyTable = (roundNumber, bidGroups) => (
