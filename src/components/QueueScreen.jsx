@@ -10,6 +10,7 @@ const QueueScreen = ({ gameType }) => {
   const [selectedPlayers, setSelectedPlayers] = useState([]);
   const [isSelecting, setIsSelecting] = useState(false);
   const [started, setStarted] = useState(false)
+  const [calculated , setCalculated] = useState({})
 
  
 
@@ -426,6 +427,9 @@ const QueueScreen = ({ gameType }) => {
       if(gameType==='diners') await calculateDinersRoundScores(round, 'pool'+poolName);
       else await calculateUBARoundScores(round, 'pool'+poolName);
       alert(`Successfully calculated! pool: ${poolName} round: ${round}`);
+      let c={...calculated}
+      c[poolName]=true
+      setCalculated(c)
     }catch{
       alert(`Failurreeeeee! pool: ${poolName} round: ${round}`);
     }
@@ -443,6 +447,9 @@ const QueueScreen = ({ gameType }) => {
         details.status=true;
       }
       await setDoc(detailsDocRef, details);
+      let c={...calculated}
+      c[poolName]=false
+      setCalculated(c)
       alert(`Next round... pool: ${poolName} round: ${round}`);
     }catch{
       alert(`Failurreeeeee! pool: ${poolName} round: ${round}`);
@@ -565,6 +572,11 @@ const QueueScreen = ({ gameType }) => {
               className="px-4 py-2  text-black rounded-lg"
               >
               Ended
+            </div>}
+            {started&&(calculated[poolName])&&<div
+              className="px-4 py-2  text-black rounded-lg"
+              >
+              Calculated
             </div>}
                 </div>
             <div className="flex flex-wrap gap-2 bg-gray-50 rounded-lg p-4">
